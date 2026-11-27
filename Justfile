@@ -6,11 +6,11 @@ default:
     just --list
 
 run:
-    $env:CGO_ENABLED='1'; go run ./cmd/hesh-ups
+    $env:CGO_ENABLED='0'; go run ./cmd/hesh-ups
 
 build:
     if (-not (Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
-    $env:CGO_ENABLED='1'; go build -ldflags "-X main.version={{version}}" -o dist/hesh-ups.exe ./cmd/hesh-ups
+    $env:CGO_ENABLED='0'; go build -ldflags "-X main.version={{version}}" -o dist/hesh-ups.exe ./cmd/hesh-ups
 
 test:
     $env:CGO_ENABLED='0'; go vet ./...
