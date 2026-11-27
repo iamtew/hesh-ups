@@ -1,0 +1,11 @@
+# HTTP
+
+Bind `127.0.0.1:18745`. GET and POST both work on fire/hide so “open URL” clients work.
+
+- Fire: `GET /api/popup/{id}?user=Ada`
+- Hide: `/api/popup/{id}/hide`
+- Hide all: `/api/popup/hide_all`
+
+Query keys fill `{placeholders}` in the slot text (`{user}`, `{amount}`, `{message}` are conventional, not special). Optional `duration_ms` override. If settings `token` is set, fire/hide/scene need `Authorization: Bearer` or `?token=`.
+
+Health: `GET /api/health`. Live view: `GET /api/state`.
