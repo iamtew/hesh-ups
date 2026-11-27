@@ -3,6 +3,7 @@
 package main
 
 import (
+	_ "embed"
 	"os"
 	"os/exec"
 	"syscall"
@@ -13,12 +14,15 @@ import (
 	"github.com/jchv/go-webview2"
 )
 
+//go:embed icon.ico
+var trayIcon []byte
+
 func runTray(s *Server) {
 	systray.Run(func() { onReady(s) }, func() {})
 }
 
 func onReady(s *Server) {
-	systray.SetIcon(icon16())
+	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
 	mOverlay := systray.AddMenuItem("Overlay preview", "Open overlay")
@@ -86,36 +90,4 @@ func messageBox(title, text string) {
 	t, _ := syscall.UTF16PtrFromString(title)
 	m, _ := syscall.UTF16PtrFromString(text)
 	syscall.NewLazyDLL("user32.dll").NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(m)), uintptr(unsafe.Pointer(t)), 0x10)
-}
-
-func icon16() []byte {
-	const w, h = 16, 16
-	xor := make([]byte, w*h*4)
-	for i := 0; i < w*h; i++ {
-		xor[i*4+0] = 255
-		xor[i*4+1] = 255
-		xor[i*4+2] = 0
-		xor[i*4+3] = 255
-	}
-	and := make([]byte, w*h/8)
-	dibSize := 40 + len(xor) + len(and)
-	ico := make([]byte, 22+dibSize)
-	ico[2], ico[4] = 1, 1
-	ico[6], ico[7] = 16, 16
-	ico[10], ico[11] = 1, 32
-	put32 := func(p, v int) {
-		ico[p] = byte(v)
-		ico[p+1] = byte(v >> 8)
-		ico[p+2] = byte(v >> 16)
-		ico[p+3] = byte(v >> 24)
-	}
-	put32(14, dibSize)
-	put32(18, 22)
-	put32(22, 40)
-	put32(26, w)
-	put32(30, h*2)
-	ico[34], ico[36] = 1, 32
-	copy(ico[62:], xor)
-	copy(ico[62+len(xor):], and)
-	return ico
 }

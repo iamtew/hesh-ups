@@ -498,7 +498,7 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 ## Systray
 
-Embedded `.ico` from `assets/` once that file exists; until then a generated 16×16 is fine.
+Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray. Exe PE icon is `rsrc_windows_amd64.syso`.
 
 - **Composer** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800)
 - **Overlay preview** — WebView `/overlay/` (1280×720 unless canvas fits)
