@@ -3,7 +3,7 @@
 package main
 
 import (
-	_ "embed"
+	"embed"
 	"os"
 	"os/exec"
 	"syscall"
@@ -17,33 +17,66 @@ import (
 //go:embed icon.ico
 var trayIcon []byte
 
+//go:embed icons/*.ico
+var menuIcons embed.FS
+
 func runTray(s *Server) {
 	systray.Run(func() { onReady(s) }, func() {})
+}
+
+func setMenuIcon(item *systray.MenuItem, name string) {
+	b, err := menuIcons.ReadFile("icons/" + name + ".ico")
+	if err != nil {
+		return
+	}
+	item.SetIcon(b)
 }
 
 func onReady(s *Server) {
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
+	setMenuIcon(mComposer, "layout-board")
 	mComposerWin := mComposer.AddSubMenuItem("Open window", "Open composer WebView")
+	setMenuIcon(mComposerWin, "app-window")
 	mComposerWeb := mComposer.AddSubMenuItem("Open in browser", "Open composer in browser")
+	setMenuIcon(mComposerWeb, "world")
 	mOverlay := systray.AddMenuItem("Overlay preview", "Open overlay")
+	setMenuIcon(mOverlay, "stack-2")
 	mOverlayWin := mOverlay.AddSubMenuItem("Open window", "Open overlay WebView")
+	setMenuIcon(mOverlayWin, "app-window")
 	mOverlayWeb := mOverlay.AddSubMenuItem("Open in browser", "Open overlay in browser")
+	setMenuIcon(mOverlayWeb, "world")
 	mOBS := systray.AddMenuItem("OBS: disconnected", "")
+	setMenuIcon(mOBS, "video-off")
 	mOBS.Disable()
 	mAuto := systray.AddMenuItemCheckbox("Run at login", "", s.setting("autostart") == "1")
+	setMenuIcon(mAuto, "login-2")
 	mData := systray.AddMenuItem("Open data folder", "")
+	setMenuIcon(mData, "folder")
 	mQuit := systray.AddMenuItem("Exit", "")
+	setMenuIcon(mQuit, "logout")
 	base := "http://" + s.setting("bind") + ":" + s.setting("port")
 	go func() {
 		t := time.NewTicker(time.Second)
 		defer t.Stop()
+		last := false
+		first := true
 		for range t.C {
-			if s.obs.connected() {
+			on := s.obs.connected()
+			if on {
 				mOBS.SetTitle("OBS: connected")
 			} else {
 				mOBS.SetTitle("OBS: disconnected")
+			}
+			if first || on != last {
+				if on {
+					setMenuIcon(mOBS, "video")
+				} else {
+					setMenuIcon(mOBS, "video-off")
+				}
+				last = on
+				first = false
 			}
 		}
 	}()

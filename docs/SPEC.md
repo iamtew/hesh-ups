@@ -49,7 +49,7 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 
 | Surface | What |
 | --- | --- |
-| Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. |
+| Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
 | Composer | `GET /composer/` — layout + OBS. Same embed. |
 | HTTP API | Fire/hide, state, health, scenes. Bind `127.0.0.1`. |
@@ -498,7 +498,7 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 ## Systray
 
-Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray. Exe PE icon is `rsrc_windows_amd64.syso`.
+Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray notification glyph. Exe PE icon is `rsrc_windows_amd64.syso`. Menu items set Tabler `.ico` from `cmd/hesh-ups/icons/` via `MenuItem.SetIcon`. Overlay page has no chrome icons.
 
 - **Composer** ▸ **Open window** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800); **Open in browser** — same URL in the system browser
 - **Overlay preview** ▸ **Open window** — WebView `/overlay/` (1280×720 unless canvas fits); **Open in browser** — same URL in the system browser
