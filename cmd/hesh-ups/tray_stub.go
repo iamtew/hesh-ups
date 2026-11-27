@@ -1,4 +1,4 @@
-//go:build !cgo
+//go:build !windows
 
 package main
 
@@ -8,5 +8,5 @@ import (
 )
 
 func runTray(s *Server) {
-	fmt.Fprintln(os.Stderr, "hesh-ups needs CGO (systray/WebView2)")
+	fmt.Fprintln(os.Stderr, "hesh-ups is Windows-only")
 }

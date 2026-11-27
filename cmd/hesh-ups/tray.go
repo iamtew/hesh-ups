@@ -1,4 +1,4 @@
-//go:build windows && cgo
+//go:build windows
 
 package main
 
@@ -10,7 +10,7 @@ import (
 	"unsafe"
 
 	"github.com/getlantern/systray"
-	"github.com/webview/webview_go"
+	"github.com/jchv/go-webview2"
 )
 
 func runTray(s *Server) {
@@ -70,15 +70,13 @@ func onReady(s *Server) {
 }
 
 func openView(title, url string, w, h int) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			messageBox("hesh-ups", "WebView2 is required.")
-			os.Exit(1)
-		}
-	}()
-	wv := webview.New(false)
+	wv := webview2.New(false)
+	if wv == nil {
+		messageBox("hesh-ups", "WebView2 is required.")
+		os.Exit(1)
+	}
 	wv.SetTitle(title)
-	wv.SetSize(w, h, webview.HintNone)
+	wv.SetSize(w, h, webview2.HintNone)
 	wv.Navigate(url)
 	wv.Run()
 	wv.Destroy()
