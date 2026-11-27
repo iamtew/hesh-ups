@@ -260,6 +260,42 @@
     el.style.zIndex = String(s.z || 0);
   }
 
+  function previewText(tmpl) {
+    var filled = String(tmpl || "").replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, function (_, name) {
+      return name === "user" ? "Ada" : "";
+    });
+    return esc(filled);
+  }
+
+  function fillBox(el, s) {
+    el.className = "box" + (s.id === sel ? " sel" : "") + (s.visible ? " live" : "");
+    if (s.css_class) el.className += " " + s.css_class;
+    el.querySelectorAll("img, video, .text").forEach(function (n) { n.remove(); });
+    var before = el.querySelector(".handle");
+    function add(node) {
+      if (before) el.insertBefore(node, before);
+      else el.appendChild(node);
+    }
+    if (s.media_kind === "image" || s.media_kind === "gif") {
+      var img = document.createElement("img");
+      img.src = "/media/" + s.media_path;
+      add(img);
+    } else if (s.media_kind === "video" && s.media_path) {
+      var v = document.createElement("video");
+      v.muted = true;
+      v.autoplay = true;
+      v.src = "/media/" + s.media_path;
+      if (s.playback === "loop") v.loop = true;
+      add(v);
+    }
+    if (s.text_template) {
+      var t = document.createElement("div");
+      t.className = "text";
+      t.innerHTML = previewText(s.text_template);
+      add(t);
+    }
+  }
+
   function applyInspectorPreview() {
     var s = slotById(sel);
     if (!s || !document.getElementById("f-x")) return;
@@ -275,11 +311,24 @@
     s.h = Math.round(h);
     s.z = Math.round(+document.getElementById("f-z").value || 0);
     s.label = document.getElementById("f-label").value;
+    var ft = document.getElementById("f-text");
+    if (ft) s.text_template = ft.value;
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
     if (el) {
       placeBox(el, s);
-      var lab = el.querySelector("span");
-      if (lab) lab.textContent = s.label;
+      var t = el.querySelector(".text");
+      if (s.text_template) {
+        if (!t) {
+          t = document.createElement("div");
+          t.className = "text";
+          var hd = el.querySelector(".handle");
+          if (hd) el.insertBefore(t, hd);
+          else el.appendChild(t);
+        }
+        t.innerHTML = previewText(s.text_template);
+      } else if (t) {
+        t.remove();
+      }
     }
     var li = list.querySelector('li[data-id="' + s.id + '"]');
     if (li) {
@@ -294,6 +343,7 @@
     document.getElementById("btn720").className = state.canvas.w === 1280 ? "sel" : "";
     document.getElementById("btn1080").className = state.canvas.w === 1920 ? "sel" : "";
     hint.style.display = state.slots.length ? "none" : "block";
+    stage.style.setProperty("--canvas-h", String(state.canvas.h));
     paintGrid();
     var ordered = state.slots.slice().sort(function (a, b) { return b.z - a.z; });
     list.innerHTML = "";
@@ -314,17 +364,9 @@
     boxes.innerHTML = "";
     state.slots.forEach(function (s) {
       var el = document.createElement("div");
-      el.className = "box" + (s.id === sel ? " sel" : "") + (s.visible ? " live" : "");
-      placeBox(el, s);
       el.dataset.id = s.id;
-      if (s.media_kind === "image" || s.media_kind === "gif") {
-        var img = document.createElement("img");
-        img.src = "/media/" + s.media_path;
-        el.appendChild(img);
-      }
-      var lab = document.createElement("span");
-      lab.textContent = s.label;
-      el.appendChild(lab);
+      placeBox(el, s);
+      fillBox(el, s);
       if (s.id === sel) {
         ["n", "s", "e", "w", "nw", "ne", "sw", "se"].forEach(function (h) {
           var hd = document.createElement("div");
@@ -508,7 +550,7 @@
   });
   inspector.addEventListener("input", function (e) {
     var id = e.target.id;
-    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label") {
+    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label" || id === "f-text") {
       applyInspectorPreview();
     }
   });

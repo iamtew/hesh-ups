@@ -23,7 +23,7 @@ hesh-ups is a **named, laid-out overlay**. Streamer.bot (or anything that can hi
 
 | Who | Job |
 | --- | --- |
-| Operator | Lay out a 1080 (or custom) overlay once: drag slots, pick files, write a text template, set play-once or loop, optional max duration. |
+| Operator | Lay out a 1080 (or custom) overlay once in a WYSIWYG composer: drag slots, pick files, write a text template, set play-once or loop, optional max duration. The stage shows media and sample-filled text as OBS will. |
 | Operator | Copy one trigger URL per slot and paste it into Streamer.bot / Stream Deck HTTP / a browser. |
 | Operator | Preview the same overlay in a WebView without guessing what OBS will show. |
 | Operator | Test-fire a slot from the composer (same URL as production), including sample `{user}` text. |
@@ -51,7 +51,7 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 | --- | --- |
 | Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
-| Composer | `GET /composer/` — layout + OBS. Same embed. |
+| Composer | `GET /composer/` — WYSIWYG stage + OBS. Same embed. |
 | HTTP API | Fire/hide, state, health, scenes. Bind `127.0.0.1`. |
 | Overlay WebSocket | `GET /ws` (upgrade) — server pushes events to overlay clients. |
 | obs-websocket client | JSON to local OBS. |
@@ -406,9 +406,9 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 
 **Layers (left ~240px):** slot list, front = high `z`. Click selects. Eye toggles `enabled`. **+** adds a slot (`id` `slot-n`, `media_kind` `none`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`). Empty canvas: one hint, no fake sample slot. No jb2 visualizers, no themes.
 
-**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. Pointer math in **canvas pixels**. Framing grid is SVG overlay on the composer only. Each slot is a box: label, optional image thumb if `media_kind` is image/gif. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
+**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **WYSIWYG** of overlay slot content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). Grid, cyan handles, and layer `label` are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page. Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box: typing updates the box live; **`PUT /api/slots/{id}` on change/blur**, same as pointerup). media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), text_template, playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
+**Inspector (right ~280px):** slot only — id, **label** (layer-list name only, not on the stage), x y w h z (sync with the box: typing updates the box live; **`PUT /api/slots/{id}` on change/blur**, same as pointerup). media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), **text_template** (updates the stage live), playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 
 If `/api/state` polling fails, a full-window down banner: application not running.
 
