@@ -631,11 +631,14 @@
     var dx = p.x - drag.px, dy = p.y - drag.py;
     var x = drag.x, y = drag.y, w = drag.w, h = drag.h;
     var hdl = drag.handle;
-    if (hdl === "move") { x += dx; y += dy; }
-    if (hdl.indexOf("w") >= 0 && hdl !== "move") { x += dx; w -= dx; }
-    if (hdl.indexOf("e") >= 0) { w += dx; }
-    if (hdl.indexOf("n") >= 0 && hdl !== "move") { y += dy; h -= dy; }
-    if (hdl.indexOf("s") >= 0) { h += dy; }
+    if (hdl === "move") {
+      x += dx; y += dy;
+    } else {
+      if (hdl.indexOf("w") >= 0) { x += dx; w -= dx; }
+      if (hdl.indexOf("e") >= 0) { w += dx; }
+      if (hdl.indexOf("n") >= 0) { y += dy; h -= dy; }
+      if (hdl.indexOf("s") >= 0) { h += dy; }
+    }
     w = Math.max(32, w); h = Math.max(32, h);
     var gx = axisGuides(true), gy = axisGuides(false);
     if (hdl === "move") {
