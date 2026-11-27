@@ -5,3 +5,7 @@ hesh-ups.exe
 *.sqlite-shm
 .env
 .env.*
+
+# Affinity Studio lock files
+assets/*.af~lock~
+
