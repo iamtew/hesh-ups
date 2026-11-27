@@ -1,0 +1,28 @@
+name: dist
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  dist:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26"
+      - uses: egor-tensin/setup-mingw@v2
+        with:
+          platform: x64
+      - uses: extractions/setup-just@v2
+      - name: WiX
+        run: dotnet tool install -g wix
+      - name: build-dist
+        run: just build-dist
+      - name: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/hesh-ups-*
