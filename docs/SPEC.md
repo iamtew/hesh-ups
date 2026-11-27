@@ -85,7 +85,7 @@ Stdlib `net/http`, `database/sql`, `embed`. No ORM. No extra HTTP framework. No 
 | SQLite | `modernc.org/sqlite` |
 | Overlay + OBS WebSocket | `github.com/coder/websocket` (OBS talks JSON on that conn; no obs-websocket helper lib) |
 | Systray | `github.com/getlantern/systray` |
-| Composer/preview window | `github.com/webview/webview_go` (WebView2 on Windows) |
+| Composer/preview window | `github.com/jchv/go-webview2` (WebView2 on Windows, no gcc) |
 
 Just for build/test. Do not add a second WS lib or a Wails/Fyne shell.
 

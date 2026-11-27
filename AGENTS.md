@@ -15,7 +15,7 @@ No force-push. No PRs for a normal ship.
 
 ## Stack
 
-Go module `github.com/iamtew/hesh-ups`. One binary: `./cmd/hesh-ups`. Pinned deps only: `modernc.org/sqlite`, `github.com/coder/websocket`, `github.com/getlantern/systray`, `github.com/webview/webview_go`. Stdlib `net/http`. No ORM, no extra HTTP/WS/OBS helper, no npm in `web/`.
+Go module `github.com/iamtew/hesh-ups`. One binary: `./cmd/hesh-ups`. Pinned deps only: `modernc.org/sqlite`, `github.com/coder/websocket`, `github.com/getlantern/systray`, `github.com/jchv/go-webview2`. Stdlib `net/http`. No ORM, no extra HTTP/WS/OBS helper, no npm in `web/`.
 
 `systray.Run` is `main()`. Tests MUST NOT start systray, WebView, or `Listen` on the product port. Use `httptest` + temp `HESH_UPS_DB`.
 

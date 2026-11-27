@@ -41,7 +41,7 @@ This bootstrap directory (`scratchpad/hesh-ups-bootstrap/`) is notes. It MUST NO
 | License | MIT (`LICENSE`) |
 | Version | `VERSION` — one line, SemVer, no `v` (`0.0.1`). Git tag, zip/MSI name, and `go build -ldflags "-X main.version=<VERSION>"` MUST use that string. |
 | Line endings | `.gitattributes`: `* text=auto eol=lf`. WiX `.wxs` / `.rtf` MAY be CRLF. |
-| Go deps | Pinned in [SPEC.md](SPEC.md) Stack: `modernc.org/sqlite`, `github.com/coder/websocket`, `github.com/getlantern/systray`, `github.com/webview/webview_go`. MUST NOT add Wails, Fyne, gorilla/websocket, or an obs-websocket wrapper. |
+| Go deps | Pinned in [SPEC.md](SPEC.md) Stack: `modernc.org/sqlite`, `github.com/coder/websocket`, `github.com/getlantern/systray`, `github.com/jchv/go-webview2`. MUST NOT add Wails, Fyne, gorilla/websocket, or an obs-websocket wrapper. |
 
 ---
 
@@ -180,9 +180,9 @@ cmd/hesh-ups/
 go build -ldflags "-X main.version=<VERSION>" -o dist/hesh-ups.exe ./cmd/hesh-ups
 ```
 
-`just test`: `go vet ./...` and `go test ./...`. MUST cover hesh-ups.md R1–R23 **in-process** (`httptest`, temp DB, `embed.FS`). MUST NOT `exec` the exe, MUST NOT start systray or WebView, MUST NOT `Listen` on the product port. CGO still compiles `cmd/hesh-ups` on Windows; tests that import `main` MAY build those files but MUST skip tray/window init (build tags or `main` only calling tray from `main()`). Live OBS (R11) MUST skip when `obs` is false.
+`just test`: `go vet ./...` and `go test ./...`. MUST cover hesh-ups.md R1–R23 **in-process** (`httptest`, temp DB, `embed.FS`). MUST NOT `exec` the exe, MUST NOT start systray or WebView, MUST NOT `Listen` on the product port. Tests that import `main` MAY build tray files but MUST skip tray/window init (`main` only calling tray from `main()`). Live OBS (R11) MUST skip when `obs` is false.
 
-CGO is required (systray, webview). Dist is **windows/amd64**. MUST NOT add fake `GOOS=linux` recipes while that is true.
+No CGO (`CGO_ENABLED=0`). Dist is **windows/amd64**. MUST NOT add fake `GOOS=linux` recipes while that is true.
 
 Listen: product `main()` binds `bind:port`; failure logs to stderr and `os.Exit(1)`. No file mutex.
 
@@ -272,5 +272,5 @@ AGENTS.md: `docs/SPEC.md` + this layout; `master`; **ship it** = commit + push; 
 - Manual stays `docs/md/` + `docs.html` (no extra SSG).
 - Do not add `internal/` for one binary.
 - Do not put sqlite in the install folder.
-- Do not invent Linux dist while the tray/WebView stack is Windows CGO.
+- Do not invent Linux dist while the tray/WebView stack is Windows-only.
 - This file plus [SPEC.md](SPEC.md) is the **product**, not a slice. Seed ships zip+MSI+Pages.
