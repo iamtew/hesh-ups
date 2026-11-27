@@ -330,7 +330,11 @@ Example: `GET /api/popup/follow?user=Ada&amount=1` with template `Thanks {user}!
 
 `POST /api/media` — `multipart/form-data`, field name `file`. Max **32 MiB**. Save under `media/` using the basename, sanitized to `[A-Za-z0-9._-]+` (reject `..`). Extension → `kind`: `png|jpg|jpeg|webp` → `image`; `gif` → `gif`; `mp4|webm` → `video`; `mp3|wav|ogg` → `audio`; else `400` `bad_media`. Too big → `too_large`. Response `{"path":"logo.png","kind":"image"}`. Collision: if the name exists, append `-` + short random suffix before the extension. Composer file pick uses this, then `PUT` the slot with that `path` and `kind`. Inspector can also pick an existing `path` from `GET /api/media`.
 
+`GET /api/settings` — kv map of the keys above except `schema_version`. Composer settings modal uses this.
+
 `PUT /api/settings` — upsert the kv keys listed above (JSON object of key → value). Port/bind change applies on **next process start** (response says so).
+
+`POST /api/quit` — 204; tray calls `systray.Quit`. Tests set a callback and MUST NOT start the tray.
 
 ### OBS
 
@@ -380,11 +384,10 @@ Overlay DOM: one node per slot (`css_class` if set), positioned with `x,y,w,h`, 
 
 Page `/composer/`. Files: `web/composer/index.html`, `style.css`, `app.js`. Vanilla. **No npm, no bundler, no interact.js.** Pointer events in `app.js` (same idea as jb2 Overlay Stage, not a copy of its themes/visualizers).
 
-Look: **broadcast console**, not a website. Steal jb2 Stage *chrome*, not its now-playing widget.
+Look: **house designer chrome** (same as Border Studio / Show Credits), not a website. Cyan selection (`#00ffff`), not Border Studio lime.
 
-- Dark: page `#111`, bars `#171717`, hairline `rgba(255,255,255,0.08)`, text `#eee`, muted `#99aab5`, selection/grid cyan `#0ff` at ~0.45 alpha.
-- `color-scheme: dark`. System UI / Geist-like sans. Dense, 12–13px labels.
-- Full viewport, `overflow: hidden` on `body`. WebView opens large (~1280×800).
+- Tokens on `body.admin`: `--shell #282828`, `--panel #222`, `--lift #3b3b3b`, `--line #4a4a4a`, `--text #e6e6e6`, `--muted #9a9a9a`, `--accent #00ffff`, `--accent2 #88f25d`, `--r 3px`.
+- Segoe UI. `color-scheme: dark`. Full viewport, `overflow: hidden` on `body`. WebView opens large (~1280×800).
 
 ### Chrome (three panes + top bar)
 
@@ -393,13 +396,17 @@ Look: **broadcast console**, not a website. Steal jb2 Stage *chrome*, not its no
 [ layers | canvas (flex) | inspector ]
 ```
 
-**Top bar:** title “Composer”; canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — Stage-only, not drawn in OBS); Snap (default on); copy overlay URL; OBS connected/disconnected pill.
+**Top bar:** brand **file menu** (Settings, Help → Pages `docs.html#composer`, Close, Quit, version); canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — composer-only, not drawn in OBS); Snap (default on); copy overlay URL; OBS scene `<select>` + Switch; OBS pill (red/green dot). Pill click opens Settings on OBS.
+
+**Settings** is a blur modal with left nav, not a workspace tab. **OBS:** host, port, password, Browser Source name, status, create/update Browser Source. Save on close (`PUT /api/settings`). **App:** Run at login, fire token. No Connect/Disconnect UI — background reconnect.
 
 **Layers (left ~240px):** slot list, front = high `z`. Click selects. Eye toggles `enabled`. **+** adds a slot (`id` `slot-n`, `media_kind` `none`, `text_template` `New slot`). Trash deletes (`DELETE`). Empty canvas: one hint, no fake sample slot. No jb2 visualizers, no themes.
 
-**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. Pointer math in **canvas pixels** (jb2 `pointerToCanvas`). Framing grid is SVG overlay on the composer only. Each slot is a box: label, optional image thumb if `media_kind` is image/gif. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
+**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. Pointer math in **canvas pixels**. Framing grid is SVG overlay on the composer only. Each slot is a box: label, optional image thumb if `media_kind` is image/gif. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** id, label, x y w h z (sync with the box), media_kind, file input → `POST /api/media`, pick existing from `GET /api/media`, text_template, playback, duration_ms, **volume** 0–100, **css_class**, **Test**, copy trigger URL, OBS host/port/password/source name, **create/update Browser Source**, scene select + switch. Autostart checkbox writes `autostart` + HKCU Run.
+**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box), media_kind, file input → `POST /api/media`, pick existing from `GET /api/media`, text_template, playback, duration_ms, **volume** 0–100, **css_class**, **Test**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here.
+
+If `/api/state` polling fails, a full-window down banner: application not running.
 
 Changing id on save = new slot (old URL 404s). Warn.
 
@@ -490,7 +497,7 @@ Use this object for both Create and Set. `url` / `width` / `height` follow live 
 
 `POST /api/obs/browser-source` runs GetInputList then Create or Set. `503` if disconnected. Operator may still need to **add the source to other scenes**; Create only attaches to the current program scene.
 
-`SetCurrentProgramScene` is a separate action (HTTP + inspector). Not tied to popup fire.
+`SetCurrentProgramScene` is a separate action (HTTP + composer top-bar picker). Not tied to popup fire.
 
 Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor requests.
 

@@ -210,7 +210,7 @@ This is the **only** overlay/composer source. Compiled into the exe. Not Pages. 
 | Repo path | HTTP |
 | --- | --- |
 | `cmd/hesh-ups/web/overlay/` | `/overlay/` (`index.html`, `style.css`, `app.js`) |
-| `cmd/hesh-ups/web/composer/` | `/composer/` (Stage-like chrome: bar, layers, canvas, inspector, `favicon.png`) |
+| `cmd/hesh-ups/web/composer/` | `/composer/` (designer chrome: bar, layers, canvas, inspector, settings modal, `favicon.png`) |
 | `cmd/hesh-ups/web/shared/` | omit until both pages actually share a file |
 
 `package main` MUST `//go:embed all:web` and serve that `embed.FS`. `just run` / `just test` / dist / MSI all use the same embed. HTTP 301 `/overlay` → `/overlay/` and `/composer` → `/composer/` so relative assets resolve. Composer and overlay are **vanilla** HTML/CSS/JS (hesh-ups.md); no npm in this tree.

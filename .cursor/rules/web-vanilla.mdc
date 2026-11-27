@@ -8,4 +8,4 @@ alwaysApply: false
 
 No npm, no bundler, no interact.js. Pointer events in `app.js`.
 
-Composer steals jb2 Stage chrome (dark bars, cyan selection), not its now-playing widget. `PUT /api/slots/{id}` on pointerup, not per mousemove. Overlay is transparent; fade CSS only (~200ms).
+Composer uses house designer chrome (`body.admin` tokens, file menu, settings modal). Cyan selection. Settings vs tools stay split: OBS/autostart in the modal, slot fields in the inspector. `PUT /api/slots/{id}` on pointerup, not per mousemove. Overlay is transparent; fade CSS only (~200ms).
