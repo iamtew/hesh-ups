@@ -1,5 +1,7 @@
 # hesh-ups
 
+![hesh-ups](assets/logo.png)
+
 Named, laid-out popup overlay for OBS. One operator, one Windows box, localhost HTTP.
 
 ```

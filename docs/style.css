@@ -22,6 +22,7 @@ a { color: var(--cyan); }
 
 .landing { min-height: 100vh; display: flex; align-items: center; }
 .landing-copy { max-width: 40rem; padding: 2rem; }
+.landing-logo { display: block; width: 96px; height: 96px; margin-bottom: 1rem; }
 .eyebrow { color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75rem; }
 .button {
   display: inline-block;
