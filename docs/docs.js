@@ -1,12 +1,17 @@
 (function () {
   var pages = [
-    { id: "overview", title: "Overview", group: "Start" },
-    { id: "running", title: "Running", group: "Start" },
-    { id: "composer", title: "Composer", group: "Surfaces" },
-    { id: "overlay", title: "Overlay", group: "Surfaces" },
-    { id: "http", title: "HTTP", group: "Build" },
-    { id: "obs", title: "OBS", group: "Build" },
+    { id: "overview", title: "Overview", group: "Start", icon: "home" },
+    { id: "running", title: "Running", group: "Start", icon: "player-play" },
+    { id: "credits", title: "Credits", group: "Start", icon: "certificate" },
+    { id: "composer", title: "Composer", group: "Surfaces", icon: "layout-board" },
+    { id: "overlay", title: "Overlay", group: "Surfaces", icon: "stack-2" },
+    { id: "http", title: "HTTP", group: "Build", icon: "world" },
+    { id: "obs", title: "OBS", group: "Build", icon: "video" },
   ];
+
+  function icon(name) {
+    return '<svg class="icon" aria-hidden="true"><use href="vendor/tabler/icons.svg#tabler-' + name + '"></use></svg>';
+  }
 
   var nav = document.getElementById("nav");
   var article = document.getElementById("doc");
@@ -22,7 +27,7 @@
     }
     var link = document.createElement("a");
     link.href = "#" + page.id;
-    link.textContent = page.title;
+    link.innerHTML = icon(page.icon) + " " + page.title;
     link.dataset.id = page.id;
     nav.appendChild(link);
   });
@@ -43,10 +48,13 @@
       var href = link.getAttribute("href") || "";
       var match = href.match(/^(?:\.\/)?([a-z0-9-]+)\.md(#[a-z0-9-]*)?$/);
       if (match && known(match[1])) link.setAttribute("href", "#" + match[1]);
+      if (href.indexOf("../vendor/") === 0 || href.indexOf("../img/") === 0) {
+        link.setAttribute("href", href.slice(3));
+      }
     });
     root.querySelectorAll("img[src]").forEach(function (img) {
       var src = img.getAttribute("src") || "";
-      if (src.indexOf("../img/") === 0) img.setAttribute("src", src.slice(3));
+      if (src.indexOf("../img/") === 0 || src.indexOf("../vendor/") === 0) img.setAttribute("src", src.slice(3));
     });
   }
 

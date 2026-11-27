@@ -73,7 +73,7 @@ packaging/
 | `.github/workflows/dist.yml` | Required for a GitHub Release: `just build-dist` on tag |
 | `assets/logo.png` | Product logo/icon master (square). `just icon` derives docs/composer/tray/exe copies. Never overwrite the master. |
 | `assets/logo.af` | Affinity Studio source for `logo.png`. |
-| `CREDITS.md` | Third-party notices that do not fit `LICENSE` |
+| `docs/md/credits.md` | Third-party notices (Pages chapter; not a root `CREDITS.md`) |
 
 **MUST NOT:** `src/` (Go), `webroot/`, `web/`, `static/`, `public/`, `frontend/` at repo root; `internal/`, `pkg/`, `app/`, `backend/`, `site/`, `website/`, `pages/`; root `main.go`; a second `go.mod`; JUCE `Builds/`; `installer/` (WiX is `packaging/`). Extra `cmd/foo` only if there is a second binary.
 
@@ -131,7 +131,12 @@ docs/
     overlay.md
     http.md
     obs.md
-  vendor/                 # marked (or equiv.) checked in; MUST NOT be CDN-only
+    credits.md            # vendored third-party notices (Pages)
+  vendor/                 # marked + tabler subset; MUST NOT be CDN-only
+    marked.min.js
+    tabler/
+      LICENSE
+      icons.svg
 ```
 
 `icons.svg` MUST exist if the HTML references it; otherwise omit.
@@ -146,6 +151,7 @@ docs/
 | `overlay.md` | Canvas, overlay page, WebSocket |
 | `http.md` | Trigger URLs, token, hide |
 | `obs.md` | obs-websocket, source setup, scenes |
+| `credits.md` | Vendored Tabler + marked notices |
 
 ### 5.3 SPEC
 
@@ -168,6 +174,7 @@ cmd/hesh-ups/
   testdata/
   icon.ico                  # derived: just icon-app
   rsrc_windows_amd64.syso   # derived: exe PE icon
+  icons/                    # Tabler tray .ico (subset; see docs/md/credits.md)
   web/
     overlay/
       index.html
@@ -177,6 +184,7 @@ cmd/hesh-ups/
       index.html
       style.css
       app.js
+      icons.svg             # same sprite as docs/vendor/tabler/icons.svg
 ```
 
 `package main`. Tests in `package main` (same package) so they can call the server without exporting a library. MUST NOT extract `internal/` until a second binary exists.

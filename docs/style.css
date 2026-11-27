@@ -20,12 +20,23 @@ html, body {
 
 a { color: var(--cyan); }
 
+.icon {
+  width: 1em;
+  height: 1em;
+  stroke: currentColor;
+  fill: none;
+  vertical-align: -0.15em;
+}
+
 .landing { min-height: 100vh; display: flex; align-items: center; }
 .landing-copy { max-width: 40rem; padding: 2rem; }
+.landing-copy p a { display: inline-flex; align-items: center; gap: 0.35rem; }
 .landing-logo { display: block; width: 96px; height: 96px; margin-bottom: 1rem; }
 .eyebrow { color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; font-size: 0.75rem; }
 .button {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
   margin-right: 1rem;
   padding: 0.4rem 0.8rem;
   background: var(--cyan);
@@ -41,7 +52,8 @@ a { color: var(--cyan); }
   background: var(--panel-bg);
   border-bottom: 1px solid var(--border);
 }
-.brand { color: var(--text); text-decoration: none; font-weight: 600; }
+.brand { color: var(--text); text-decoration: none; font-weight: 600; display: inline-flex; align-items: center; gap: 0.35rem; }
+.topbar a { display: inline-flex; align-items: center; gap: 0.35rem; }
 .topbar-label { color: var(--muted); flex: 1; }
 
 .shell { display: flex; min-height: calc(100vh - 3rem); }
@@ -51,7 +63,7 @@ a { color: var(--cyan); }
   background: var(--panel-bg);
   border-right: 1px solid var(--border);
 }
-.nav a { display: block; padding: 0.25rem 0; color: var(--text); text-decoration: none; }
+.nav a { display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; color: var(--text); text-decoration: none; }
 .nav a[aria-current="page"] { color: var(--cyan); }
 .nav-group { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; margin: 1rem 0 0.25rem; }
 .doc { flex: 1; padding: 1.5rem 2rem; max-width: 48rem; }
