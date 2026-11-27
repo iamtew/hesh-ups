@@ -33,6 +33,7 @@ func setMenuIcon(item *systray.MenuItem, name string) {
 }
 
 func onReady(s *Server) {
+	s.onQuit = systray.Quit
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
 	mComposer := systray.AddMenuItem("Composer", "Open composer")

@@ -36,6 +36,9 @@ type Server struct {
 	live   map[string]liveSlot
 	seq    map[string]int
 	timers map[string]*time.Timer
+
+	// Tests set this; tray sets systray.Quit. Nil = 204 and do nothing.
+	onQuit func()
 }
 
 func NewServer(dbPath, version string) (*Server, error) {
@@ -78,7 +81,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("DELETE /api/slots/{id}", s.handleDeleteSlot)
 	mux.HandleFunc("GET /api/media", s.handleListMedia)
 	mux.HandleFunc("POST /api/media", s.handleUpload)
+	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", s.handleSettings)
+	mux.HandleFunc("POST /api/quit", s.handleQuit)
 	mux.HandleFunc("GET /api/popup/hide_all", s.authed(s.handleHideAll))
 	mux.HandleFunc("POST /api/popup/hide_all", s.authed(s.handleHideAll))
 	mux.HandleFunc("GET /api/popup/{id}/hide", s.authed(s.handleHide))
@@ -374,6 +379,24 @@ func (s *Server) handleMediaFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.ServeFile(w, r, clean)
+}
+
+func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
+	out := map[string]string{}
+	for k := range defaultSettings {
+		if k == "schema_version" {
+			continue
+		}
+		out[k] = s.setting(k)
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleQuit(w http.ResponseWriter, r *http.Request) {
+	if s.onQuit != nil {
+		s.onQuit()
+	}
+	w.WriteHeader(204)
 }
 
 func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {

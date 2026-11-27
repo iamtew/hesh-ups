@@ -669,3 +669,35 @@ func TestR23Envelope(t *testing.T) {
 		t.Fatal(e)
 	}
 }
+
+func TestGetSettings(t *testing.T) {
+	_, ts := testSrv(t)
+	doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"token": "secret"})
+	var kv map[string]string
+	res := getJSON(t, ts, "/api/settings", &kv)
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode)
+	}
+	if _, ok := kv["schema_version"]; ok {
+		t.Fatal("schema_version should be omitted")
+	}
+	if kv["token"] != "secret" {
+		t.Fatal(kv["token"])
+	}
+	if kv["obs_host"] != "127.0.0.1" {
+		t.Fatal(kv["obs_host"])
+	}
+}
+
+func TestQuitHook(t *testing.T) {
+	s, ts := testSrv(t)
+	n := 0
+	s.onQuit = func() { n++ }
+	res, _ := doJSON(t, "POST", ts.URL+"/api/quit", nil)
+	if res.StatusCode != 204 {
+		t.Fatal(res.StatusCode)
+	}
+	if n != 1 {
+		t.Fatal(n)
+	}
+}
