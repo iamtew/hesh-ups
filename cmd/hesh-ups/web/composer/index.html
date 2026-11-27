@@ -2,40 +2,137 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Composer</title>
+    <title>hesh-ups</title>
     <link rel="icon" type="image/png" href="favicon.png" />
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body>
-    <header class="top">
-      <h1><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-layout-board"></use></svg> Composer</h1>
-      <button type="button" id="btn720"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-tv"></use></svg> 720p</button>
-      <button type="button" id="btn1080"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-desktop"></use></svg> 1080p</button>
-      <label><input type="checkbox" id="grid-thirds" /> thirds</label>
-      <label><input type="checkbox" id="grid-center" /> center</label>
-      <label><input type="checkbox" id="grid-safe" /> safe</label>
-      <label><input type="checkbox" id="snap" checked /> Snap</label>
-      <button type="button" id="copy-overlay"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-copy"></use></svg> Copy overlay URL</button>
-      <span id="obs-pill" class="pill"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-video-off"></use></svg> OBS: disconnected</span>
-    </header>
-    <div class="panes">
-      <aside class="layers">
-        <div class="layers-head">
-          <span><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-stack-2"></use></svg> Layers</span>
-          <button type="button" id="add-slot" aria-label="Add slot"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg></button>
+  <body class="admin">
+    <div id="down-banner" hidden>
+      <div id="down-msg" role="status">Error: hesh-ups application not running!</div>
+    </div>
+    <div id="settings-overlay" class="blur-overlay" hidden>
+      <div id="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="settings-head">
+          <span id="settings-title">Settings</span>
+          <button type="button" id="settings-close" aria-label="Close settings">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-x"></use></svg>
+          </button>
         </div>
-        <ul id="layer-list"></ul>
-      </aside>
-      <div class="stage-wrap">
-        <div id="stage">
-          <svg id="grid"></svg>
-          <div id="boxes"></div>
+        <div class="settings-body">
+          <nav class="settings-nav" aria-label="Settings">
+            <button type="button" data-set="obs" class="sel">
+              <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-video"></use></svg> OBS
+            </button>
+            <button type="button" data-set="app">
+              <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-settings"></use></svg> App
+            </button>
+          </nav>
+          <div class="settings-main">
+            <section id="set-obs">
+              <p class="settings-hint">Tools → WebSocket Server Settings in OBS. The app reconnects in the background.</p>
+              <label>Host <input id="obs-host" type="text" autocomplete="off" spellcheck="false" /></label>
+              <label>Port <input id="obs-port" type="number" min="1" max="65535" step="1" /></label>
+              <label>Password <input id="obs-pass" type="password" autocomplete="off" spellcheck="false" /></label>
+              <label>Browser Source name <input id="obs-src" type="text" autocomplete="off" spellcheck="false" /></label>
+              <p id="obs-status" class="settings-hint">Disconnected</p>
+              <div class="settings-actions">
+                <button type="button" id="obs-browser">
+                  <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-browser"></use></svg> Create / update Browser Source
+                </button>
+              </div>
+              <p id="obs-msg" class="settings-hint"></p>
+            </section>
+            <section id="set-app" hidden>
+              <p class="settings-hint">Fire/hide URLs use the token when it is set. Empty means localhost is open.</p>
+              <label><input type="checkbox" id="autostart" /> Run at login</label>
+              <label>Token <input id="app-token" type="password" autocomplete="off" spellcheck="false" /></label>
+            </section>
+          </div>
         </div>
-        <p id="empty-hint" class="hint"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg> Add a slot to start.</p>
       </div>
-      <aside class="inspector" id="inspector">
-        <p class="muted">Select a slot</p>
-      </aside>
+    </div>
+    <div id="shell">
+      <div id="bar">
+        <div class="bar-left">
+          <div class="bar-brand-wrap">
+            <button type="button" id="btn-file" aria-haspopup="true" aria-expanded="false" aria-controls="file-menu">
+              <img src="favicon.png" alt="" />
+              <span class="bar-brand">hesh-ups</span>
+            </button>
+            <div id="file-menu" hidden>
+              <button type="button" id="file-settings">
+                <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-settings"></use></svg> Settings
+              </button>
+              <button type="button" id="file-help">
+                <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-book"></use></svg> Help
+              </button>
+              <div class="file-sep">
+                <button type="button" id="file-close">
+                  <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-x"></use></svg> Close
+                </button>
+                <button type="button" id="file-quit">
+                  <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-power"></use></svg> Quit
+                </button>
+              </div>
+              <div id="file-version"></div>
+            </div>
+          </div>
+          <button type="button" id="btn720">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-tv"></use></svg> 720p
+          </button>
+          <button type="button" id="btn1080">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-desktop"></use></svg> 1080p
+          </button>
+          <div id="grid-toggles">
+            <span>Grid:</span>
+            <label><input type="checkbox" id="grid-thirds" /> thirds</label>
+            <label><input type="checkbox" id="grid-center" /> center</label>
+            <label><input type="checkbox" id="grid-safe" /> safe</label>
+            <label><input type="checkbox" id="snap" /> Snap</label>
+          </div>
+        </div>
+        <div class="bar-overlay">
+          <button type="button" id="copy-overlay">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-copy"></use></svg> Copy overlay URL
+          </button>
+          <select id="obs-scene" aria-label="OBS scene"></select>
+          <button type="button" id="obs-switch">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-layers-intersect"></use></svg> Switch
+          </button>
+          <button type="button" id="obs-pill" title="OBS connection settings">
+            <span class="dot" aria-hidden="true"></span>
+            <span id="obs-pill-text">OBS offline</span>
+          </button>
+        </div>
+      </div>
+      <div id="wrap">
+        <aside id="sidebar" class="win">
+          <div class="layers-head">
+            <span class="win-title">
+              <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-stack-2"></use></svg> Layers
+            </span>
+            <button type="button" id="add-slot" aria-label="Add slot">
+              <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg>
+            </button>
+          </div>
+          <ul id="layer-list"></ul>
+        </aside>
+        <div id="stage-wrap" class="win">
+          <div id="stage">
+            <svg id="grid"></svg>
+            <div id="boxes"></div>
+          </div>
+          <p id="empty-hint" class="hint">
+            <svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg> Add a slot to start.
+          </p>
+        </div>
+        <aside id="inspector-pane" class="win">
+          <div class="win-title">Properties</div>
+          <div id="inspector" class="win-body">
+            <p class="muted">Select a slot</p>
+          </div>
+        </aside>
+      </div>
     </div>
     <script src="app.js"></script>
   </body>

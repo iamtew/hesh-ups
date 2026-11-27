@@ -2,12 +2,17 @@
   var state = { canvas: { w: 1920, h: 1080 }, slots: [], obs: { connected: false, scenes: [] } };
   var sel = null;
   var drag = null;
+  var gridReady = false;
   var stage = document.getElementById("stage");
   var boxes = document.getElementById("boxes");
   var grid = document.getElementById("grid");
   var list = document.getElementById("layer-list");
   var inspector = document.getElementById("inspector");
   var hint = document.getElementById("empty-hint");
+  var downBanner = document.getElementById("down-banner");
+  var settingsOverlay = document.getElementById("settings-overlay");
+  var fileMenu = document.getElementById("file-menu");
+  var btnFile = document.getElementById("btn-file");
 
   function icon(name) {
     return '<svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-' + name + '"></use></svg>';
@@ -20,14 +25,40 @@
     return "letter-t";
   }
 
-  function setObsPill(connected) {
-    var el = document.getElementById("obs-pill");
-    el.className = "pill" + (connected ? " on" : "");
-    el.innerHTML = icon(connected ? "video" : "video-off") + (connected ? " OBS: connected" : " OBS: disconnected");
-  }
-
   function origin() {
     return location.origin;
+  }
+
+  function setObsPill(connected) {
+    var el = document.getElementById("obs-pill");
+    el.className = connected ? "up" : "";
+    document.getElementById("obs-pill-text").textContent = connected ? "OBS connected" : "OBS offline";
+    var st = document.getElementById("obs-status");
+    if (st) st.textContent = connected ? "Connected" : "Disconnected";
+  }
+
+  function fillScenes(obs) {
+    var sc = document.getElementById("obs-scene");
+    var cur = sc.value;
+    sc.innerHTML = "";
+    (obs && obs.scenes ? obs.scenes : []).forEach(function (name) {
+      var o = document.createElement("option");
+      o.value = name;
+      o.textContent = name;
+      if (name === (obs.current_scene || cur)) o.selected = true;
+      sc.appendChild(o);
+    });
+    sc.disabled = !obs || !obs.connected;
+    document.getElementById("obs-switch").disabled = sc.disabled;
+  }
+
+  function applyGridFlags(flags, snap) {
+    var g = flags || "";
+    document.getElementById("grid-thirds").checked = g.indexOf("thirds") >= 0;
+    document.getElementById("grid-center").checked = g.indexOf("center") >= 0;
+    document.getElementById("grid-safe").checked = g.indexOf("safe") >= 0;
+    document.getElementById("snap").checked = snap === "1";
+    gridReady = true;
   }
 
   function pointerToCanvas(ev) {
@@ -44,9 +75,15 @@
   }
 
   function load() {
-    return fetch("/api/state").then(function (r) { return r.json(); }).then(function (s) {
+    return fetch("/api/state").then(function (r) {
+      if (!r.ok) throw new Error("down");
+      downBanner.hidden = true;
+      return r.json();
+    }).then(function (s) {
       state = s;
       render();
+    }).catch(function () {
+      downBanner.hidden = false;
     });
   }
 
@@ -106,8 +143,9 @@
 
   function render() {
     setObsPill(state.obs && state.obs.connected);
-    document.getElementById("btn720").className = state.canvas.w === 1280 ? "on" : "";
-    document.getElementById("btn1080").className = state.canvas.w === 1920 ? "on" : "";
+    fillScenes(state.obs);
+    document.getElementById("btn720").className = state.canvas.w === 1280 ? "sel" : "";
+    document.getElementById("btn1080").className = state.canvas.w === 1920 ? "sel" : "";
     hint.style.display = state.slots.length ? "none" : "block";
     paintGrid();
     var ordered = state.slots.slice().sort(function (a, b) { return b.z - a.z; });
@@ -117,7 +155,7 @@
       if (s.id === sel) li.className = "sel";
       li.innerHTML = '<button type="button" data-eye="' + s.id + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span>" + s.label + "</span>";
       li.addEventListener("click", function (e) {
-        if (e.target.getAttribute("data-eye")) return;
+        if (e.target.closest("[data-eye]")) return;
         sel = s.id;
         render();
       });
@@ -175,15 +213,7 @@
       '<label>duration_ms <input id="f-dur" type="number" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
       '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>' +
       '<label>css_class <input id="f-css" value="' + (s.css_class || "") + '"></label>' +
-      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>" +
-      '<label>OBS host <input id="obs-host"></label>' +
-      '<label>OBS port <input id="obs-port"></label>' +
-      '<label>OBS password <input id="obs-pass" type="password"></label>' +
-      '<label>source name <input id="obs-src"></label>' +
-      '<p><button type="button" id="obs-browser">' + icon("browser") + " Create/update Browser Source</button></p>" +
-      '<label>scene <select id="obs-scene"></select></label>' +
-      '<p><button type="button" id="obs-switch">' + icon("layers-intersect") + " Switch scene</button></p>" +
-      '<label><input type="checkbox" id="autostart"> Run at login</label>';
+      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
     document.getElementById("f-kind").value = s.media_kind;
     document.getElementById("f-play").value = s.playback;
     fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
@@ -197,20 +227,6 @@
         if (f.path === s.media_path) o.selected = true;
         selEl.appendChild(o);
       });
-    });
-    fetch("/api/obs/scenes").then(function (r) { return r.json(); }).then(function (o) {
-      var sc = document.getElementById("obs-scene");
-      if (!sc) return;
-      (o.scenes || []).forEach(function (name) {
-        var opt = document.createElement("option");
-        opt.value = name;
-        opt.textContent = name;
-        if (name === o.current_scene) opt.selected = true;
-        sc.appendChild(opt);
-      });
-    }).catch(function () {});
-    fetch("/api/state").then(function (r) { return r.json(); }).then(function () {
-      return fetch("/api/settings-dump").catch(function () { return { ok: false }; });
     });
   }
 
@@ -239,6 +255,61 @@
     };
   }
 
+  function showSettingsPage(name) {
+    document.querySelectorAll(".settings-nav button").forEach(function (b) {
+      b.classList.toggle("sel", b.dataset.set === name);
+    });
+    document.getElementById("set-obs").hidden = name !== "obs";
+    document.getElementById("set-app").hidden = name !== "app";
+  }
+
+  function fillSettings(kv) {
+    document.getElementById("obs-host").value = kv.obs_host || "";
+    document.getElementById("obs-port").value = kv.obs_port || "";
+    document.getElementById("obs-pass").value = kv.obs_password || "";
+    document.getElementById("obs-src").value = kv.obs_browser_source || "";
+    document.getElementById("autostart").checked = kv.autostart === "1";
+    document.getElementById("app-token").value = kv.token || "";
+    document.getElementById("obs-msg").textContent = "";
+    if (!gridReady) applyGridFlags(kv.composer_grid, kv.composer_snap);
+  }
+
+  function settingsPayload() {
+    return {
+      obs_host: document.getElementById("obs-host").value,
+      obs_port: document.getElementById("obs-port").value,
+      obs_password: document.getElementById("obs-pass").value,
+      obs_browser_source: document.getElementById("obs-src").value,
+      autostart: document.getElementById("autostart").checked ? "1" : "0",
+      token: document.getElementById("app-token").value,
+    };
+  }
+
+  function saveSettings() {
+    return fetch("/api/settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settingsPayload()),
+    });
+  }
+
+  function openSettings(page) {
+    fileMenu.hidden = true;
+    fetch("/api/settings").then(function (r) { return r.json(); }).then(function (kv) {
+      fillSettings(kv);
+      showSettingsPage(page || "obs");
+      settingsOverlay.hidden = false;
+    });
+  }
+
+  function closeSettings() {
+    if (settingsOverlay.hidden) return;
+    saveSettings().then(function () {
+      settingsOverlay.hidden = true;
+      load();
+    });
+  }
+
   inspector.addEventListener("click", function (e) {
     var s = slotById(sel);
     if (!s) return;
@@ -264,18 +335,6 @@
     if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
     }
-    if (id === "obs-browser") {
-      fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
-        obs_host: document.getElementById("obs-host").value,
-        obs_port: document.getElementById("obs-port").value,
-        obs_password: document.getElementById("obs-pass").value,
-        obs_browser_source: document.getElementById("obs-src").value,
-      }) }).then(function () { return fetch("/api/obs/browser-source", { method: "POST" }); });
-    }
-    if (id === "obs-switch") {
-      var name = document.getElementById("obs-scene").value;
-      fetch("/api/obs/scene/" + encodeURIComponent(name), { method: "POST" });
-    }
   });
   inspector.addEventListener("change", function (e) {
     if (e.target.id === "f-file" && e.target.files[0]) {
@@ -288,9 +347,6 @@
         s.media_kind = m.kind;
         return saveSlot(s);
       });
-    }
-    if (e.target.id === "autostart") {
-      fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ autostart: e.target.checked ? "1" : "0" }) });
     }
   });
 
@@ -340,6 +396,57 @@
       paintGrid();
     });
   });
+
+  document.getElementById("obs-switch").addEventListener("click", function () {
+    var name = document.getElementById("obs-scene").value;
+    if (!name) return;
+    fetch("/api/obs/scene/" + encodeURIComponent(name), { method: "POST" });
+  });
+  document.getElementById("obs-pill").addEventListener("click", function () { openSettings("obs"); });
+  document.getElementById("obs-browser").addEventListener("click", function () {
+    saveSettings().then(function () {
+      return fetch("/api/obs/browser-source", { method: "POST" });
+    }).then(function (r) {
+      var msg = document.getElementById("obs-msg");
+      if (r.ok) {
+        msg.textContent = "Browser Source created or updated.";
+        return;
+      }
+      return r.json().then(function (e) {
+        msg.textContent = (e && e.message) || "failed";
+      });
+    });
+  });
+
+  btnFile.addEventListener("click", function (e) {
+    e.stopPropagation();
+    fileMenu.hidden = !fileMenu.hidden;
+    btnFile.setAttribute("aria-expanded", fileMenu.hidden ? "false" : "true");
+  });
+  document.getElementById("file-settings").addEventListener("click", function () { openSettings("obs"); });
+  document.getElementById("file-help").addEventListener("click", function () {
+    fileMenu.hidden = true;
+    window.open("https://iamtew.github.io/hesh-ups/docs.html#composer", "_blank");
+  });
+  document.getElementById("file-close").addEventListener("click", function () { window.close(); });
+  document.getElementById("file-quit").addEventListener("click", function () {
+    fetch("/api/quit", { method: "POST" });
+  });
+  document.querySelectorAll(".settings-nav button").forEach(function (b) {
+    b.addEventListener("click", function () { showSettingsPage(b.dataset.set); });
+  });
+  document.getElementById("settings-close").addEventListener("click", closeSettings);
+  settingsOverlay.addEventListener("click", function (e) {
+    if (e.target === settingsOverlay) closeSettings();
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") closeSettings();
+  });
+  document.addEventListener("click", function () {
+    fileMenu.hidden = true;
+    btnFile.setAttribute("aria-expanded", "false");
+  });
+  fileMenu.addEventListener("click", function (e) { e.stopPropagation(); });
 
   boxes.addEventListener("pointerdown", function (ev) {
     var t = ev.target;
@@ -397,10 +504,24 @@
     if (s) saveSlot(s);
   });
 
-  load().then(function () {
+  fetch("/api/health").then(function (r) { return r.json(); }).then(function (h) {
+    document.getElementById("file-version").textContent = h.version || "";
+  }).catch(function () {});
+  fetch("/api/settings").then(function (r) { return r.json(); }).then(function (kv) {
+    fillSettings(kv);
+    return load();
+  }).then(function () {
     setInterval(function () {
-      fetch("/api/state").then(function (r) { return r.json(); }).then(function (s) {
+      fetch("/api/state").then(function (r) {
+        if (!r.ok) throw new Error("down");
+        downBanner.hidden = true;
+        return r.json();
+      }).then(function (s) {
+        state.obs = s.obs;
         setObsPill(s.obs && s.obs.connected);
+        fillScenes(s.obs);
+      }).catch(function () {
+        downBanner.hidden = false;
       });
     }, 2000);
   });
