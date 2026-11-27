@@ -20,6 +20,12 @@
     return '<svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-' + name + '"></use></svg>';
   }
 
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
   function kindIcon(s) {
     if (s.media_kind === "image" || s.media_kind === "gif") return "photo";
     if (s.media_kind === "video") return "movie";
@@ -141,12 +147,37 @@
     });
   }
 
-  function saveSlot(slot) {
+  function putSlot(slot) {
     return fetch("/api/slots/" + encodeURIComponent(slot.id), {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(slot),
-    }).then(function (r) { return r.json(); }).then(load);
+    }).then(function (r) {
+      return r.json().then(function (body) {
+        if (!r.ok) {
+          var msg = (body && body.message) || "Save failed";
+          setStatus(msg);
+          var err = new Error(msg);
+          err.save = true;
+          throw err;
+        }
+        return body;
+      });
+    });
+  }
+
+  function saveSlot(slot) {
+    return putSlot(slot).then(load);
+  }
+
+  function persist(old, body) {
+    return putSlot(body).then(function () {
+      if (body.id === old.id) return;
+      return fetch("/api/slots/" + encodeURIComponent(old.id), { method: "DELETE" });
+    }).then(function () {
+      sel = body.id;
+      return load();
+    });
   }
 
   function paintGrid() {
@@ -207,7 +238,9 @@
     ordered.forEach(function (s) {
       var li = document.createElement("li");
       if (s.id === sel) li.className = "sel";
-      li.innerHTML = '<button type="button" data-eye="' + s.id + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span>" + s.label + "</span>";
+      li.dataset.id = s.id;
+      li.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
+      li.querySelector("span").textContent = s.label || s.id;
       li.addEventListener("click", function (e) {
         if (e.target.closest("[data-eye]")) return;
         sel = s.id;
@@ -252,8 +285,8 @@
       return;
     }
     inspector.innerHTML =
-      '<label>id <input id="f-id" value="' + s.id + '"></label>' +
-      '<label>label <input id="f-label" value="' + (s.label || "") + '"></label>' +
+      '<label>id <input id="f-id" value="' + esc(s.id) + '"></label>' +
+      '<label>label <input id="f-label" value="' + esc(s.label || "") + '"></label>' +
       '<label>x <input id="f-x" type="number" value="' + s.x + '"></label>' +
       '<label>y <input id="f-y" type="number" value="' + s.y + '"></label>' +
       '<label>w <input id="f-w" type="number" value="' + s.w + '"></label>' +
@@ -262,13 +295,17 @@
       '<label>media_kind <select id="f-kind"><option>none</option><option>image</option><option>gif</option><option>video</option><option>audio</option></select></label>' +
       '<label>file <input id="f-file" type="file"></label>' +
       '<label>existing <select id="f-media"></select></label>' +
-      '<label>text_template <textarea id="f-text">' + (s.text_template || "") + "</textarea></label>" +
+      '<label>text_template <textarea id="f-text">' + esc(s.text_template || "") + "</textarea></label>" +
       '<label>playback <select id="f-play"><option>once</option><option>loop</option></select></label>' +
       '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
       '<p class="muted">Blank duration stays on until Hide. Default for new slots is 5000.</p>' +
       '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>' +
-      '<label>css_class <input id="f-css" value="' + (s.css_class || "") + '"></label>' +
-      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-hide">' + icon("eye-off") + " Hide</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
+      '<label>css_class <input id="f-css" value="' + esc(s.css_class || "") + '"></label>' +
+      '<p><button type="button" id="f-save">' + icon("device-floppy") + ' Save</button> ' +
+      '<button type="button" id="f-test">' + icon("player-play") + ' Test</button> ' +
+      '<button type="button" id="f-hide">' + icon("eye-off") + ' Hide</button> ' +
+      '<button type="button" id="f-copy">' + icon("link") + ' Copy trigger URL</button> ' +
+      '<button type="button" id="f-del">' + icon("trash") + ' Trash</button></p>';
     document.getElementById("f-kind").value = s.media_kind;
     document.getElementById("f-play").value = s.playback;
     fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
@@ -380,22 +417,20 @@
     if (id === "f-save") {
       var body = readForm(s);
       if (!body) return;
-      if (body.id !== s.id) {
-        fetch("/api/slots/" + encodeURIComponent(body.id), { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
-          .then(function () { return fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }); })
-          .then(function () { sel = body.id; return load(); });
-        return;
-      }
-      saveSlot(body);
+      persist(s, body).catch(function () {});
     }
     if (id === "f-test") {
-      fetch(popupURL(s.id, "user=Ada"), { method: "POST" }).then(function (r) {
-        if (r.ok) {
-          setStatus("Fired " + s.id);
-          return;
-        }
-        errMsg(r).then(setStatus);
-      }).catch(function () { setStatus("Fire failed"); });
+      var fired = readForm(s);
+      if (!fired) return;
+      persist(s, fired).then(function () {
+        return fetch(popupURL(fired.id, "user=Ada"), { method: "POST" });
+      }).then(function (r) {
+        if (!r.ok) return errMsg(r).then(setStatus);
+        var sticky = fired.duration_ms == null && fired.media_kind !== "video" && fired.media_kind !== "audio";
+        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fired.id);
+      }).catch(function (err) {
+        if (!err || !err.save) setStatus("Fire failed");
+      });
     }
     if (id === "f-hide") {
       fetch(origin() + "/api/popup/" + encodeURIComponent(s.id) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
