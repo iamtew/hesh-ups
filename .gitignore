@@ -1,0 +1,7 @@
+dist/
+hesh-ups.exe
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+.env
+.env.*

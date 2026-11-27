@@ -1,0 +1,11 @@
+---
+description: Overlay and composer stay vanilla HTML/CSS/JS
+globs: cmd/hesh-ups/web/**
+alwaysApply: false
+---
+
+# Embedded UI
+
+No npm, no bundler, no interact.js. Pointer events in `app.js`.
+
+Composer steals jb2 Stage chrome (dark bars, cyan selection), not its now-playing widget. `PUT /api/slots/{id}` on pointerup, not per mousemove. Overlay is transparent; fade CSS only (~200ms).

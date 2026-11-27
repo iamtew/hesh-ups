@@ -1,0 +1,3 @@
+* text=auto eol=lf
+*.wxs text eol=crlf
+*.rtf text eol=crlf
