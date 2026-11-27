@@ -13,6 +13,8 @@
   var settingsOverlay = document.getElementById("settings-overlay");
   var fileMenu = document.getElementById("file-menu");
   var btnFile = document.getElementById("btn-file");
+  var token = "";
+  var statusTimer = null;
 
   function icon(name) {
     return '<svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-' + name + '"></use></svg>';
@@ -27,6 +29,58 @@
 
   function origin() {
     return location.origin;
+  }
+
+  function setStatus(msg) {
+    var el = document.getElementById("bar-status");
+    el.textContent = msg || "";
+    if (statusTimer) clearTimeout(statusTimer);
+    if (msg) {
+      statusTimer = setTimeout(function () { el.textContent = ""; }, 4000);
+    }
+  }
+
+  function tokenQuery() {
+    return token ? "?token=" + encodeURIComponent(token) : "";
+  }
+
+  function popupURL(id, extra) {
+    var q = tokenQuery();
+    if (extra) q = q ? q + "&" + extra : "?" + extra;
+    return origin() + "/api/popup/" + encodeURIComponent(id) + q;
+  }
+
+  function copyText(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(text).catch(function () {
+        return copyFallback(text);
+      });
+    }
+    return copyFallback(text);
+  }
+
+  function copyFallback(text) {
+    return new Promise(function (resolve, reject) {
+      var ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.left = "-9999px";
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        if (!document.execCommand("copy")) throw new Error("copy");
+        resolve();
+      } catch (err) {
+        reject(err);
+      }
+      document.body.removeChild(ta);
+    });
+  }
+
+  function errMsg(r) {
+    return r.json().then(function (e) {
+      return (e && e.message) || r.statusText || "failed";
+    }).catch(function () { return r.statusText || "failed"; });
   }
 
   function setObsPill(connected) {
@@ -210,10 +264,11 @@
       '<label>existing <select id="f-media"></select></label>' +
       '<label>text_template <textarea id="f-text">' + (s.text_template || "") + "</textarea></label>" +
       '<label>playback <select id="f-play"><option>once</option><option>loop</option></select></label>' +
-      '<label>duration_ms <input id="f-dur" type="number" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
+      '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
+      '<p class="muted">Blank duration stays on until Hide. Default for new slots is 5000.</p>' +
       '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>' +
       '<label>css_class <input id="f-css" value="' + (s.css_class || "") + '"></label>' +
-      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
+      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-hide">' + icon("eye-off") + " Hide</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
     document.getElementById("f-kind").value = s.media_kind;
     document.getElementById("f-play").value = s.playback;
     fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
@@ -271,6 +326,7 @@
     document.getElementById("autostart").checked = kv.autostart === "1";
     document.getElementById("app-token").value = kv.token || "";
     document.getElementById("obs-msg").textContent = "";
+    token = kv.token || "";
     if (!gridReady) applyGridFlags(kv.composer_grid, kv.composer_snap);
   }
 
@@ -295,16 +351,22 @@
 
   function openSettings(page) {
     fileMenu.hidden = true;
-    fetch("/api/settings").then(function (r) { return r.json(); }).then(function (kv) {
+    showSettingsPage(page || "obs");
+    settingsOverlay.hidden = false;
+    fetch("/api/settings").then(function (r) {
+      if (!r.ok) throw new Error("settings");
+      return r.json();
+    }).then(function (kv) {
       fillSettings(kv);
-      showSettingsPage(page || "obs");
-      settingsOverlay.hidden = false;
+    }).catch(function () {
+      setStatus("Could not load settings");
     });
   }
 
   function closeSettings() {
     if (settingsOverlay.hidden) return;
     saveSettings().then(function () {
+      token = document.getElementById("app-token").value;
       settingsOverlay.hidden = true;
       load();
     });
@@ -327,10 +389,22 @@
       saveSlot(body);
     }
     if (id === "f-test") {
-      fetch("/api/popup/" + encodeURIComponent(s.id) + "?user=Ada", { method: "POST" });
+      fetch(popupURL(s.id, "user=Ada"), { method: "POST" }).then(function (r) {
+        if (r.ok) {
+          setStatus("Fired " + s.id);
+          return;
+        }
+        errMsg(r).then(setStatus);
+      }).catch(function () { setStatus("Fire failed"); });
+    }
+    if (id === "f-hide") {
+      fetch(origin() + "/api/popup/" + encodeURIComponent(s.id) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
+        if (r.ok) setStatus("Hidden " + s.id);
+        else errMsg(r).then(setStatus);
+      }).catch(function () { setStatus("Hide failed"); });
     }
     if (id === "f-copy") {
-      navigator.clipboard.writeText(origin() + "/api/popup/" + encodeURIComponent(s.id));
+      copyText(popupURL(s.id)).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
     }
     if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
@@ -347,6 +421,18 @@
         s.media_kind = m.kind;
         return saveSlot(s);
       });
+    }
+    if (e.target.id === "f-media" && e.target.value) {
+      var s = slotById(sel);
+      if (!s) return;
+      s.media_path = e.target.value;
+      var kind = "image";
+      var p = s.media_path.toLowerCase();
+      if (p.indexOf(".gif") >= 0) kind = "gif";
+      else if (/\.(mp4|webm)$/.test(p)) kind = "video";
+      else if (/\.(mp3|wav|ogg)$/.test(p)) kind = "audio";
+      s.media_kind = kind;
+      saveSlot(s);
     }
   });
 
@@ -369,13 +455,19 @@
       body: JSON.stringify({
         id: id, label: "New slot", x: 80, y: 80, w: 320, h: 180, z: n,
         media_kind: "none", media_path: "", text_template: "New slot", playback: "once",
-        duration_ms: null, volume: 100, enabled: true, css_class: "",
+        duration_ms: 5000, volume: 100, enabled: true, css_class: "",
       }),
     }).then(function () { sel = id; return load(); });
   });
 
   document.getElementById("copy-overlay").addEventListener("click", function () {
-    navigator.clipboard.writeText(origin() + "/overlay/");
+    copyText(origin() + "/overlay/").then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
+  });
+  document.getElementById("hide-all").addEventListener("click", function () {
+    fetch(origin() + "/api/popup/hide_all" + tokenQuery(), { method: "POST" }).then(function (r) {
+      if (r.ok) setStatus("Hidden all");
+      else errMsg(r).then(setStatus);
+    }).catch(function () { setStatus("Hide all failed"); });
   });
   document.getElementById("btn720").addEventListener("click", function () {
     fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canvas_w: "1280", canvas_h: "720" }) }).then(load);
@@ -399,8 +491,14 @@
 
   document.getElementById("obs-switch").addEventListener("click", function () {
     var name = document.getElementById("obs-scene").value;
-    if (!name) return;
-    fetch("/api/obs/scene/" + encodeURIComponent(name), { method: "POST" });
+    if (!name) {
+      setStatus("No scene");
+      return;
+    }
+    fetch("/api/obs/scene/" + encodeURIComponent(name) + tokenQuery(), { method: "POST" }).then(function (r) {
+      if (r.ok) setStatus("Scene " + name);
+      else errMsg(r).then(setStatus);
+    }).catch(function () { setStatus("Scene switch failed"); });
   });
   document.getElementById("obs-pill").addEventListener("click", function () { openSettings("obs"); });
   document.getElementById("obs-browser").addEventListener("click", function () {
@@ -426,11 +524,14 @@
   document.getElementById("file-settings").addEventListener("click", function () { openSettings("obs"); });
   document.getElementById("file-help").addEventListener("click", function () {
     fileMenu.hidden = true;
-    window.open("https://iamtew.github.io/hesh-ups/docs.html#composer", "_blank");
+    fetch("/api/help", { method: "POST" }).catch(function () {});
   });
-  document.getElementById("file-close").addEventListener("click", function () { window.close(); });
+  document.getElementById("file-close").addEventListener("click", function () {
+    fileMenu.hidden = true;
+    fetch("/api/view/close", { method: "POST" }).finally(function () { window.close(); });
+  });
   document.getElementById("file-quit").addEventListener("click", function () {
-    fetch("/api/quit", { method: "POST" });
+    fetch("/api/quit", { method: "POST" }).catch(function () {});
   });
   document.querySelectorAll(".settings-nav button").forEach(function (b) {
     b.addEventListener("click", function () { showSettingsPage(b.dataset.set); });

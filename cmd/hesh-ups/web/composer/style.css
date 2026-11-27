@@ -59,6 +59,7 @@ body.admin input[type="checkbox"] { width: auto; }
   display: inline-flex; align-items: center; gap: 6px; width: auto;
 }
 #bar #obs-scene { width: 10em; }
+#bar-status { font-size: 12px; max-width: 16em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #grid-toggles {
   display: flex; align-items: center; flex-wrap: wrap; gap: 10px; font-size: 12px;
   padding-left: 12px; border-left: 1px solid var(--line); color: var(--muted);
