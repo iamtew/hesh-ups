@@ -23,6 +23,7 @@ type obsClient struct {
 	list   []string
 	wait   map[string]chan obsResp
 	cancel context.CancelFunc
+	kickCh chan struct{}
 }
 
 type obsResp struct {
@@ -32,7 +33,7 @@ type obsResp struct {
 }
 
 func newOBS(s *Server) *obsClient {
-	o := &obsClient{s: s, wait: map[string]chan obsResp{}}
+	o := &obsClient{s: s, wait: map[string]chan obsResp{}, kickCh: make(chan struct{}, 1)}
 	ctx, cancel := context.WithCancel(context.Background())
 	o.cancel = cancel
 	go o.loop(ctx)
@@ -49,6 +50,19 @@ func (o *obsClient) stop() {
 	}
 	o.online = false
 	o.mu.Unlock()
+}
+
+func (o *obsClient) kick() {
+	o.mu.Lock()
+	if o.conn != nil {
+		o.conn.Close(websocket.StatusNormalClosure, "")
+		o.conn = nil
+	}
+	o.mu.Unlock()
+	select {
+	case o.kickCh <- struct{}{}:
+	default:
+	}
 }
 
 func (o *obsClient) connected() bool {
@@ -85,6 +99,8 @@ func (o *obsClient) loop(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
+		case <-o.kickCh:
+			backoff = time.Second
 		case <-time.After(backoff):
 		}
 		backoff *= 2

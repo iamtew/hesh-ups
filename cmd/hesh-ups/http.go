@@ -37,8 +37,10 @@ type Server struct {
 	seq    map[string]int
 	timers map[string]*time.Timer
 
-	// Tests set this; tray sets systray.Quit. Nil = 204 and do nothing.
-	onQuit func()
+	// Tests stub these; tray sets real ones. Nil = 204 and do nothing.
+	onQuit     func()
+	onHelp     func()
+	closeViews func()
 }
 
 func NewServer(dbPath, version string) (*Server, error) {
@@ -84,6 +86,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/settings", s.handleGetSettings)
 	mux.HandleFunc("PUT /api/settings", s.handleSettings)
 	mux.HandleFunc("POST /api/quit", s.handleQuit)
+	mux.HandleFunc("POST /api/view/close", s.handleViewClose)
+	mux.HandleFunc("POST /api/help", s.handleHelp)
 	mux.HandleFunc("GET /api/popup/hide_all", s.authed(s.handleHideAll))
 	mux.HandleFunc("POST /api/popup/hide_all", s.authed(s.handleHideAll))
 	mux.HandleFunc("GET /api/popup/{id}/hide", s.authed(s.handleHide))
@@ -393,8 +397,25 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleQuit(w http.ResponseWriter, r *http.Request) {
+	if s.closeViews != nil {
+		s.closeViews()
+	}
 	if s.onQuit != nil {
 		s.onQuit()
+	}
+	w.WriteHeader(204)
+}
+
+func (s *Server) handleViewClose(w http.ResponseWriter, r *http.Request) {
+	if s.closeViews != nil {
+		s.closeViews()
+	}
+	w.WriteHeader(204)
+}
+
+func (s *Server) handleHelp(w http.ResponseWriter, r *http.Request) {
+	if s.onHelp != nil {
+		s.onHelp()
 	}
 	w.WriteHeader(204)
 }
@@ -406,6 +427,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	restart := false
+	obsKick := false
 	for k, v := range kv {
 		if _, ok := defaultSettings[k]; !ok {
 			continue
@@ -416,10 +438,16 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if k == "bind" || k == "port" {
 			restart = true
 		}
+		if strings.HasPrefix(k, "obs_") {
+			obsKick = true
+		}
 		_ = s.setSetting(k, v)
 		if k == "autostart" {
 			setAutostart(v == "1")
 		}
+	}
+	if obsKick {
+		s.obs.kick()
 	}
 	s.broadcastConfig()
 	msg := map[string]any{"ok": true}

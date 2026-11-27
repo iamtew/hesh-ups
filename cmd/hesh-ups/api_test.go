@@ -692,12 +692,40 @@ func TestGetSettings(t *testing.T) {
 func TestQuitHook(t *testing.T) {
 	s, ts := testSrv(t)
 	n := 0
+	closed := 0
+	s.closeViews = func() { closed++ }
 	s.onQuit = func() { n++ }
 	res, _ := doJSON(t, "POST", ts.URL+"/api/quit", nil)
 	if res.StatusCode != 204 {
 		t.Fatal(res.StatusCode)
 	}
-	if n != 1 {
-		t.Fatal(n)
+	if n != 1 || closed != 1 {
+		t.Fatal(n, closed)
+	}
+}
+
+func TestViewCloseAndHelp(t *testing.T) {
+	s, ts := testSrv(t)
+	closed, helped := 0, 0
+	s.closeViews = func() { closed++ }
+	s.onHelp = func() { helped++ }
+	res, _ := doJSON(t, "POST", ts.URL+"/api/view/close", nil)
+	if res.StatusCode != 204 {
+		t.Fatal(res.StatusCode)
+	}
+	res, _ = doJSON(t, "POST", ts.URL+"/api/help", nil)
+	if res.StatusCode != 204 {
+		t.Fatal(res.StatusCode)
+	}
+	if closed != 1 || helped != 1 {
+		t.Fatal(closed, helped)
+	}
+}
+
+func TestObsKickOnSettings(t *testing.T) {
+	_, ts := testSrv(t)
+	res, b := doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"obs_password": "x"})
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
 	}
 }

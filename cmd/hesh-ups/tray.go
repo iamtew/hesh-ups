@@ -6,12 +6,21 @@ import (
 	"embed"
 	"os"
 	"os/exec"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
 
 	"github.com/getlantern/systray"
 	"github.com/jchv/go-webview2"
+)
+
+const docsURL = "https://iamtew.github.io/hesh-ups/docs.html#composer"
+
+var (
+	viewMu     sync.Mutex
+	composerWV webview2.WebView
+	overlayWV  webview2.WebView
 )
 
 //go:embed icon.ico
@@ -33,7 +42,12 @@ func setMenuIcon(item *systray.MenuItem, name string) {
 }
 
 func onReady(s *Server) {
-	s.onQuit = systray.Quit
+	s.closeViews = closeViews
+	s.onHelp = func() { openBrowser(docsURL) }
+	s.onQuit = func() {
+		closeViews()
+		systray.Quit()
+	}
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
@@ -108,6 +122,7 @@ func onReady(s *Server) {
 			case <-mData.ClickedCh:
 				_ = exec.Command("explorer.exe", s.dataDir).Start()
 			case <-mQuit.ClickedCh:
+				closeViews()
 				systray.Quit()
 				return
 			}
@@ -121,6 +136,19 @@ func openBrowser(url string) {
 	_ = cmd.Start()
 }
 
+func closeViews() {
+	viewMu.Lock()
+	cvs := []webview2.WebView{composerWV, overlayWV}
+	viewMu.Unlock()
+	for _, wv := range cvs {
+		if wv == nil {
+			continue
+		}
+		w := wv
+		w.Dispatch(func() { w.Terminate() })
+	}
+}
+
 func openView(title, url string, w, h int) {
 	wv := webview2.New(false)
 	if wv == nil {
@@ -129,8 +157,22 @@ func openView(title, url string, w, h int) {
 	}
 	wv.SetTitle(title)
 	wv.SetSize(w, h, webview2.HintNone)
+	viewMu.Lock()
+	if title == "Composer" {
+		composerWV = wv
+	} else {
+		overlayWV = wv
+	}
+	viewMu.Unlock()
 	wv.Navigate(url)
 	wv.Run()
+	viewMu.Lock()
+	if title == "Composer" {
+		composerWV = nil
+	} else {
+		overlayWV = nil
+	}
+	viewMu.Unlock()
 	wv.Destroy()
 }
 
