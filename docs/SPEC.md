@@ -49,14 +49,14 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 
 | Surface | What |
 | --- | --- |
-| Systray | Exit; open composer WebView; open overlay preview WebView; OBS connected/disconnected. |
+| Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
-| Composer | `GET /composer/` — WebView. Layout + OBS. Same embed. |
+| Composer | `GET /composer/` — layout + OBS. Same embed. |
 | HTTP API | Fire/hide, state, health, scenes. Bind `127.0.0.1`. |
 | Overlay WebSocket | `GET /ws` (upgrade) — server pushes events to overlay clients. |
 | obs-websocket client | JSON to local OBS. |
 
-UIs open in **WebView**, not the system browser.
+Tray **Open window** uses WebView. **Open in browser** uses the system browser on the same URLs.
 
 ## Defaults
 
@@ -500,8 +500,8 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray. Exe PE icon is `rsrc_windows_amd64.syso`.
 
-- **Composer** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800)
-- **Overlay preview** — WebView `/overlay/` (1280×720 unless canvas fits)
+- **Composer** ▸ **Open window** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800); **Open in browser** — same URL in the system browser
+- **Overlay preview** ▸ **Open window** — WebView `/overlay/` (1280×720 unless canvas fits); **Open in browser** — same URL in the system browser
 - **OBS: connected** / **OBS: disconnected** — label
 - **Run at login** — checkable; same as settings `autostart`
 - **Open data folder** — Explorer on `%APPDATA%\hesh-ups`

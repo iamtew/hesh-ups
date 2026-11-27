@@ -25,7 +25,11 @@ func onReady(s *Server) {
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
+	mComposerWin := mComposer.AddSubMenuItem("Open window", "Open composer WebView")
+	mComposerWeb := mComposer.AddSubMenuItem("Open in browser", "Open composer in browser")
 	mOverlay := systray.AddMenuItem("Overlay preview", "Open overlay")
+	mOverlayWin := mOverlay.AddSubMenuItem("Open window", "Open overlay WebView")
+	mOverlayWeb := mOverlay.AddSubMenuItem("Open in browser", "Open overlay in browser")
 	mOBS := systray.AddMenuItem("OBS: disconnected", "")
 	mOBS.Disable()
 	mAuto := systray.AddMenuItemCheckbox("Run at login", "", s.setting("autostart") == "1")
@@ -46,10 +50,14 @@ func onReady(s *Server) {
 	go func() {
 		for {
 			select {
-			case <-mComposer.ClickedCh:
+			case <-mComposerWin.ClickedCh:
 				openView("Composer", base+"/composer/", 1280, 800)
-			case <-mOverlay.ClickedCh:
+			case <-mComposerWeb.ClickedCh:
+				openBrowser(base + "/composer/")
+			case <-mOverlayWin.ClickedCh:
 				openView("Overlay", base+"/overlay/", 1280, 720)
+			case <-mOverlayWeb.ClickedCh:
+				openBrowser(base + "/overlay/")
 			case <-mAuto.ClickedCh:
 				on := !mAuto.Checked()
 				if on {
@@ -71,6 +79,12 @@ func onReady(s *Server) {
 			}
 		}
 	}()
+}
+
+func openBrowser(url string) {
+	cmd := exec.Command("cmd", "/c", "start", "", url)
+	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
+	_ = cmd.Start()
 }
 
 func openView(title, url string, w, h int) {

@@ -1,6 +1,6 @@
 # Composer
 
-Open from the tray. Three panes: layers, canvas, inspector.
+Open from the tray (WebView or system browser). Three panes: layers, canvas, inspector.
 
 - Drag slots on the letterboxed canvas. Snap and grid (thirds, center, safe) are composer-only; OBS does not draw them.
 - Pick a file (copied into `media/`) and/or write a `{placeholder}` text template.
