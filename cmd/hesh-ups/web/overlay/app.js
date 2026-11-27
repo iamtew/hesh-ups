@@ -19,10 +19,18 @@
           document.body.style.width = msg.canvas.w + "px";
           document.body.style.height = msg.canvas.h + "px";
         }
+        Object.keys(nodes).forEach(place);
         return;
       }
       if (msg.type === "snapshot") {
-        (msg.visible || []).forEach(show);
+        var keep = {};
+        (msg.visible || []).forEach(function (v) {
+          keep[v.id || v.slot] = true;
+          show(v);
+        });
+        Object.keys(nodes).forEach(function (id) {
+          if (!keep[id]) hide(id);
+        });
         return;
       }
       if (msg.type === "show") {
@@ -42,19 +50,29 @@
     };
   }
 
-  function nodeFor(id) {
+  function place(id) {
     var n = nodes[id];
-    if (n) return n;
-    var meta = slots[id] || { x: 0, y: 0, w: 100, h: 100, z: 0, css_class: "" };
-    n = document.createElement("div");
+    var meta = slots[id];
+    if (!n || !meta) return;
+    var on = n.classList.contains("is-on");
     n.className = "slot" + (meta.css_class ? " " + meta.css_class : "");
+    if (on) n.classList.add("is-on");
     n.style.left = (meta.x || 0) + "px";
     n.style.top = (meta.y || 0) + "px";
     n.style.width = (meta.w || 100) + "px";
     n.style.height = (meta.h || 100) + "px";
     n.style.zIndex = String(meta.z || 0);
-    canvas.appendChild(n);
-    nodes[id] = n;
+  }
+
+  function nodeFor(id) {
+    var n = nodes[id];
+    if (!n) {
+      n = document.createElement("div");
+      n.className = "slot";
+      canvas.appendChild(n);
+      nodes[id] = n;
+    }
+    place(id);
     return n;
   }
 
