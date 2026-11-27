@@ -397,6 +397,32 @@ func TestR14Text(t *testing.T) {
 	}
 }
 
+func TestDurationZeroIsSticky(t *testing.T) {
+	_, ts := testSrv(t)
+	doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+		"id": "follow", "label": "f", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
+		"media_kind": "none", "text_template": "Hi", "playback": "once", "duration_ms": 0, "volume": 100, "enabled": true,
+	})
+	doJSON(t, "POST", ts.URL+"/api/popup/follow", nil)
+	time.Sleep(80 * time.Millisecond)
+	var st map[string]any
+	getJSON(t, ts, "/api/state", &st)
+	found := false
+	for _, raw := range st["slots"].([]any) {
+		m := raw.(map[string]any)
+		if m["id"] != "follow" {
+			continue
+		}
+		found = true
+		if m["visible"] != true {
+			t.Fatal("duration 0 hid the slot")
+		}
+	}
+	if !found {
+		t.Fatal("missing slot")
+	}
+}
+
 func TestR15Empty(t *testing.T) {
 	_, ts := testSrv(t)
 	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/empty", map[string]any{

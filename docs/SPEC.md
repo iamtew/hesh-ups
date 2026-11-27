@@ -192,7 +192,7 @@ Two knobs, independent:
 | `duration_ms` set | Wall-clock max from this fire (request may override). Loop-for-8s = `loop` + `duration_ms=8000`. |
 | `playback=once`, video/audio, `duration_ms` null | Overlay sends `ended`; server hides. |
 | `playback=once`, video/audio, `duration_ms` set | Hide at duration even if the file is longer (cut). If the file ends first, **hold last frame / silence** until duration (do not loop). |
-| Image/gif/text, `duration_ms` null | Sticky until hide. |
+| Image/gif/text, `duration_ms` null or `<= 0` | Sticky until hide. Zero is not a timer. |
 
 Retrigger while visible: restart media from the start, re-render text, restart the duration timer.
 

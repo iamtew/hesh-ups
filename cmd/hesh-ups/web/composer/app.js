@@ -214,16 +214,42 @@
     return best;
   }
 
-  function guides() {
-    var g = [0, state.canvas.w, state.canvas.w / 2, state.canvas.h, state.canvas.h / 2];
+  function axisGuides(horizontal) {
+    var w = state.canvas.w, h = state.canvas.h;
+    var g = horizontal ? [0, w, w / 2] : [0, h, h / 2];
     if (document.getElementById("grid-thirds").checked) {
-      g.push(state.canvas.w / 3, (2 * state.canvas.w) / 3, state.canvas.h / 3, (2 * state.canvas.h) / 3);
+      if (horizontal) g.push(w / 3, (2 * w) / 3);
+      else g.push(h / 3, (2 * h) / 3);
+    }
+    if (document.getElementById("grid-safe").checked) {
+      var m = Math.round(h * 0.05);
+      if (horizontal) g.push(m, w - m);
+      else g.push(m, h - m);
     }
     state.slots.forEach(function (s) {
       if (s.id === sel) return;
-      g.push(s.x, s.y, s.x + s.w, s.y + s.h, s.x + s.w / 2, s.y + s.h / 2);
+      if (horizontal) g.push(s.x, s.x + s.w, s.x + s.w / 2);
+      else g.push(s.y, s.y + s.h, s.y + s.h / 2);
     });
     return g;
+  }
+
+  function snapEdge(pos, size, guides) {
+    if (!document.getElementById("snap").checked) return pos;
+    var best = pos;
+    var d = 12;
+    function consider(edge) {
+      guides.forEach(function (g) {
+        var delta = Math.abs(edge - g);
+        if (delta < d) {
+          d = delta;
+          best = pos + (g - edge);
+        }
+      });
+    }
+    consider(pos);
+    consider(pos + size);
+    return best;
   }
 
   function render() {
@@ -239,6 +265,7 @@
       var li = document.createElement("li");
       if (s.id === sel) li.className = "sel";
       li.dataset.id = s.id;
+      if (s.visible) li.className = (li.className ? li.className + " " : "") + "live";
       li.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
       li.querySelector("span").textContent = s.label || s.id;
       li.addEventListener("click", function (e) {
@@ -251,7 +278,7 @@
     boxes.innerHTML = "";
     state.slots.forEach(function (s) {
       var el = document.createElement("div");
-      el.className = "box" + (s.id === sel ? " sel" : "");
+      el.className = "box" + (s.id === sel ? " sel" : "") + (s.visible ? " live" : "");
       el.style.left = (s.x / state.canvas.w * 100) + "%";
       el.style.top = (s.y / state.canvas.h * 100) + "%";
       el.style.width = (s.w / state.canvas.w * 100) + "%";
@@ -315,6 +342,7 @@
       (m.files || []).forEach(function (f) {
         var o = document.createElement("option");
         o.value = f.path;
+        o.dataset.kind = f.kind || "";
         o.textContent = f.path;
         if (f.path === s.media_path) o.selected = true;
         selEl.appendChild(o);
@@ -426,7 +454,7 @@
         return fetch(popupURL(fired.id, "user=Ada"), { method: "POST" });
       }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
-        var sticky = fired.duration_ms == null && fired.media_kind !== "video" && fired.media_kind !== "audio";
+        var sticky = (fired.duration_ms == null || fired.duration_ms <= 0) && fired.media_kind !== "video" && fired.media_kind !== "audio";
         setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fired.id);
       }).catch(function (err) {
         if (!err || !err.save) setStatus("Fire failed");
@@ -461,12 +489,8 @@
       var s = slotById(sel);
       if (!s) return;
       s.media_path = e.target.value;
-      var kind = "image";
-      var p = s.media_path.toLowerCase();
-      if (p.indexOf(".gif") >= 0) kind = "gif";
-      else if (/\.(mp4|webm)$/.test(p)) kind = "video";
-      else if (/\.(mp3|wav|ogg)$/.test(p)) kind = "audio";
-      s.media_kind = kind;
+      var opt = e.target.selectedOptions && e.target.selectedOptions[0];
+      if (opt && opt.dataset.kind) s.media_kind = opt.dataset.kind;
       saveSlot(s);
     }
   });
@@ -613,8 +637,16 @@
     if (hdl.indexOf("n") >= 0 && hdl !== "move") { y += dy; h -= dy; }
     if (hdl.indexOf("s") >= 0) { h += dy; }
     w = Math.max(32, w); h = Math.max(32, h);
-    var g = guides();
-    x = snapVal(x, g); y = snapVal(y, g);
+    var gx = axisGuides(true), gy = axisGuides(false);
+    if (hdl === "move") {
+      x = snapEdge(x, w, gx);
+      y = snapEdge(y, h, gy);
+    } else {
+      if (hdl.indexOf("w") >= 0) x = snapVal(x, gx);
+      if (hdl.indexOf("e") >= 0) w = Math.max(32, snapVal(x + w, gx) - x);
+      if (hdl.indexOf("n") >= 0) y = snapVal(y, gy);
+      if (hdl.indexOf("s") >= 0) h = Math.max(32, snapVal(y + h, gy) - y);
+    }
     x = Math.max(0, Math.min(state.canvas.w - w, x));
     y = Math.max(0, Math.min(state.canvas.h - h, y));
     s.x = Math.round(x); s.y = Math.round(y); s.w = Math.round(w); s.h = Math.round(h);
@@ -654,6 +686,14 @@
         return r.json();
       }).then(function (s) {
         state.obs = s.obs;
+        (s.slots || []).forEach(function (sl) {
+          var cur = slotById(sl.id);
+          if (cur) cur.visible = !!sl.visible;
+        });
+        document.querySelectorAll("#layer-list li, #boxes .box").forEach(function (el) {
+          var cur = slotById(el.dataset.id);
+          if (cur) el.classList.toggle("live", !!cur.visible);
+        });
         setObsPill(s.obs && s.obs.connected);
         fillScenes(s.obs);
       }).catch(function () {

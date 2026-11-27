@@ -63,11 +63,14 @@ func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text
 	seq := s.seq[id]
 	eff := sl.DurationMS
 	if durOverride != nil {
-		if *durOverride == 0 {
+		if *durOverride <= 0 {
 			eff = nil
 		} else {
 			eff = durOverride
 		}
+	}
+	if eff != nil && *eff <= 0 {
+		eff = nil
 	}
 	s.live[id] = liveSlot{
 		Seq: seq, Text: text, MediaKind: sl.MediaKind, MediaPath: sl.MediaPath,
