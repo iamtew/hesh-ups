@@ -334,7 +334,11 @@ Example: `GET /api/popup/follow?user=Ada&amount=1` with template `Thanks {user}!
 
 `PUT /api/settings` — upsert the kv keys listed above (JSON object of key → value). Port/bind change applies on **next process start** (response says so).
 
-`POST /api/quit` — 204; tray calls `systray.Quit`. Tests set a callback and MUST NOT start the tray.
+`POST /api/quit` — 204; close WebView windows then tray `systray.Quit`. Tests set callbacks and MUST NOT start the tray.
+
+`POST /api/view/close` — 204; Terminate composer/overlay WebViews if open. Browser tabs still `window.close()`.
+
+`POST /api/help` — 204; open Pages `docs.html#composer` in the system browser. Tests stub; MUST NOT `exec`.
 
 ### OBS
 
@@ -396,15 +400,15 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 [ layers | canvas (flex) | inspector ]
 ```
 
-**Top bar:** brand **file menu** (Settings, Help → Pages `docs.html#composer`, Close, Quit, version); canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — composer-only, not drawn in OBS); Snap (default on); copy overlay URL; OBS scene `<select>` + Switch; OBS pill (red/green dot). Pill click opens Settings on OBS.
+**Top bar:** brand **file menu** (Settings, Help → `POST /api/help`, Close → `POST /api/view/close`, Quit, version); canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — composer-only, not drawn in OBS); Snap (default on); copy overlay URL; **Hide all**; OBS scene `<select>` + Switch; OBS pill (red/green dot). Pill click opens Settings on OBS. Status line for copy/fire/hide/errors.
 
-**Settings** is a blur modal with left nav, not a workspace tab. **OBS:** host, port, password, Browser Source name, status, create/update Browser Source. Save on close (`PUT /api/settings`). **App:** Run at login, fire token. No Connect/Disconnect UI — background reconnect.
+**Settings** is a blur modal with left nav, not a workspace tab. **OBS:** host, port, password, Browser Source name, status, create/update Browser Source. Save on close (`PUT /api/settings`); writing `obs_*` kicks the websocket so a new password is used immediately. **App:** Run at login, fire token. No Connect/Disconnect UI — background reconnect.
 
-**Layers (left ~240px):** slot list, front = high `z`. Click selects. Eye toggles `enabled`. **+** adds a slot (`id` `slot-n`, `media_kind` `none`, `text_template` `New slot`). Trash deletes (`DELETE`). Empty canvas: one hint, no fake sample slot. No jb2 visualizers, no themes.
+**Layers (left ~240px):** slot list, front = high `z`. Click selects. Eye toggles `enabled`. **+** adds a slot (`id` `slot-n`, `media_kind` `none`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`). Empty canvas: one hint, no fake sample slot. No jb2 visualizers, no themes.
 
 **Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. Pointer math in **canvas pixels**. Framing grid is SVG overlay on the composer only. Each slot is a box: label, optional image thumb if `media_kind` is image/gif. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box), media_kind, file input → `POST /api/media`, pick existing from `GET /api/media`, text_template, playback, duration_ms, **volume** 0–100, **css_class**, **Test**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here.
+**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box), media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), text_template, playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here.
 
 If `/api/state` polling fails, a full-window down banner: application not running.
 
