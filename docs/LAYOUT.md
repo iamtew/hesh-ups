@@ -71,7 +71,8 @@ packaging/
 | `.cursor/` | Cursor rules for this repo |
 | `.editorconfig` | If editors need it beyond `.gitattributes` |
 | `.github/workflows/dist.yml` | Required for a GitHub Release: `just build-dist` on tag |
-| `assets/icon.png` | Product icon master. `just icon` derives ico + `docs/img`. Never overwrite the master. |
+| `assets/logo.png` | Product logo/icon master (square). `just icon` derives docs/composer/tray/exe copies. Never overwrite the master. |
+| `assets/logo.af` | Affinity Studio source for `logo.png`. |
 | `CREDITS.md` | Third-party notices that do not fit `LICENSE` |
 
 **MUST NOT:** `src/` (Go), `webroot/`, `web/`, `static/`, `public/`, `frontend/` at repo root; `internal/`, `pkg/`, `app/`, `backend/`, `site/`, `website/`, `pages/`; root `main.go`; a second `go.mod`; JUCE `Builds/`; `installer/` (WiX is `packaging/`). Extra `cmd/foo` only if there is a second binary.
@@ -120,7 +121,9 @@ docs/
   docs.html
   docs.js
   style.css
+  favicon.ico             # derived: just icon-docs
   img/
+    logo.png              # derived: copy of assets/logo.png
   md/
     overview.md
     running.md
@@ -163,6 +166,8 @@ cmd/hesh-ups/
   slots.go
   *_test.go
   testdata/
+  icon.ico                  # derived: just icon-app
+  rsrc_windows_amd64.syso   # derived: exe PE icon
   web/
     overlay/
       index.html
@@ -197,7 +202,7 @@ This is the **only** overlay/composer source. Compiled into the exe. Not Pages. 
 | Repo path | HTTP |
 | --- | --- |
 | `cmd/hesh-ups/web/overlay/` | `/overlay/` (`index.html`, `style.css`, `app.js`) |
-| `cmd/hesh-ups/web/composer/` | `/composer/` (Stage-like chrome: bar, layers, canvas, inspector) |
+| `cmd/hesh-ups/web/composer/` | `/composer/` (Stage-like chrome: bar, layers, canvas, inspector, `favicon.png`) |
 | `cmd/hesh-ups/web/shared/` | omit until both pages actually share a file |
 
 `package main` MUST `//go:embed all:web` and serve that `embed.FS`. `just run` / `just test` / dist / MSI all use the same embed. HTTP 301 `/overlay` → `/overlay/` and `/composer` → `/composer/` so relative assets resolve. Composer and overlay are **vanilla** HTML/CSS/JS (hesh-ups.md); no npm in this tree.
@@ -249,8 +254,12 @@ PowerShell. `default` → `just --list`.
 | `msi` | `package` then `msi-only` |
 | `build-dist` | `package` + zip + MSI |
 | `clean` | delete `dist/`; `go clean` |
+| `icon` | `icon-docs` + `icon-web` + `icon-app` from `assets/logo.png` |
+| `icon-docs` | copy `docs/img/logo.png`; magick `docs/favicon.ico` |
+| `icon-web` | magick 32px `cmd/hesh-ups/web/composer/favicon.png` |
+| `icon-app` | magick `cmd/hesh-ups/icon.ico`; rsrc `.syso` |
 
-`just icon` only after `assets/` exists; writes derived files under `docs/img/` / packaging; never overwrites the master.
+`just icon` requires `magick` on PATH. Never overwrite `assets/logo.png` or `assets/logo.af`. Commit the derived files so build/test/Pages do not need ImageMagick. WiX uses `cmd/hesh-ups/icon.ico` (no second copy under `packaging/`).
 
 MUST NOT add recipes that emit a website outside `docs/`.
 
