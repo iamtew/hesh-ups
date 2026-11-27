@@ -252,6 +252,42 @@
     return best;
   }
 
+  function placeBox(el, s) {
+    el.style.left = (s.x / state.canvas.w * 100) + "%";
+    el.style.top = (s.y / state.canvas.h * 100) + "%";
+    el.style.width = (s.w / state.canvas.w * 100) + "%";
+    el.style.height = (s.h / state.canvas.h * 100) + "%";
+    el.style.zIndex = String(s.z || 0);
+  }
+
+  function applyInspectorPreview() {
+    var s = slotById(sel);
+    if (!s || !document.getElementById("f-x")) return;
+    var w = Math.max(32, +document.getElementById("f-w").value || 0);
+    var h = Math.max(32, +document.getElementById("f-h").value || 0);
+    var x = +document.getElementById("f-x").value || 0;
+    var y = +document.getElementById("f-y").value || 0;
+    x = Math.max(0, Math.min(state.canvas.w - w, x));
+    y = Math.max(0, Math.min(state.canvas.h - h, y));
+    s.x = Math.round(x);
+    s.y = Math.round(y);
+    s.w = Math.round(w);
+    s.h = Math.round(h);
+    s.z = Math.round(+document.getElementById("f-z").value || 0);
+    s.label = document.getElementById("f-label").value;
+    var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
+    if (el) {
+      placeBox(el, s);
+      var lab = el.querySelector("span");
+      if (lab) lab.textContent = s.label;
+    }
+    var li = list.querySelector('li[data-id="' + s.id + '"]');
+    if (li) {
+      var sp = li.querySelector("span");
+      if (sp) sp.textContent = s.label || s.id;
+    }
+  }
+
   function render() {
     setObsPill(state.obs && state.obs.connected);
     fillScenes(state.obs);
@@ -279,10 +315,7 @@
     state.slots.forEach(function (s) {
       var el = document.createElement("div");
       el.className = "box" + (s.id === sel ? " sel" : "") + (s.visible ? " live" : "");
-      el.style.left = (s.x / state.canvas.w * 100) + "%";
-      el.style.top = (s.y / state.canvas.h * 100) + "%";
-      el.style.width = (s.w / state.canvas.w * 100) + "%";
-      el.style.height = (s.h / state.canvas.h * 100) + "%";
+      placeBox(el, s);
       el.dataset.id = s.id;
       if (s.media_kind === "image" || s.media_kind === "gif") {
         var img = document.createElement("img");
@@ -473,6 +506,12 @@
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
     }
   });
+  inspector.addEventListener("input", function (e) {
+    var id = e.target.id;
+    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label") {
+      applyInspectorPreview();
+    }
+  });
   inspector.addEventListener("change", function (e) {
     if (e.target.id === "f-file" && e.target.files[0]) {
       var fd = new FormData();
@@ -484,6 +523,7 @@
         s.media_kind = m.kind;
         return saveSlot(s);
       });
+      return;
     }
     if (e.target.id === "f-media" && e.target.value) {
       var s = slotById(sel);
@@ -492,7 +532,22 @@
       var opt = e.target.selectedOptions && e.target.selectedOptions[0];
       if (opt && opt.dataset.kind) s.media_kind = opt.dataset.kind;
       saveSlot(s);
+      return;
     }
+    if (e.target.id === "f-id") return;
+    var persist = { "f-x": 1, "f-y": 1, "f-w": 1, "f-h": 1, "f-z": 1, "f-label": 1, "f-kind": 1, "f-text": 1, "f-play": 1, "f-dur": 1, "f-vol": 1, "f-css": 1 };
+    if (!persist[e.target.id]) return;
+    var s = slotById(sel);
+    if (!s) return;
+    applyInspectorPreview();
+    s.media_kind = document.getElementById("f-kind").value;
+    s.text_template = document.getElementById("f-text").value;
+    s.playback = document.getElementById("f-play").value;
+    var dur = document.getElementById("f-dur").value;
+    s.duration_ms = dur === "" ? null : +dur;
+    s.volume = +document.getElementById("f-vol").value;
+    s.css_class = document.getElementById("f-css").value;
+    saveSlot(s);
   });
 
   list.addEventListener("click", function (e) {
@@ -661,12 +716,7 @@
       document.getElementById("f-h").value = s.h;
     }
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
-    if (el) {
-      el.style.left = (s.x / state.canvas.w * 100) + "%";
-      el.style.top = (s.y / state.canvas.h * 100) + "%";
-      el.style.width = (s.w / state.canvas.w * 100) + "%";
-      el.style.height = (s.h / state.canvas.h * 100) + "%";
-    }
+    if (el) placeBox(el, s);
   });
   boxes.addEventListener("pointerup", function () {
     if (!drag) return;

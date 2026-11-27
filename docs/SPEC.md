@@ -408,7 +408,7 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 
 **Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. Pointer math in **canvas pixels**. Framing grid is SVG overlay on the composer only. Each slot is a box: label, optional image thumb if `media_kind` is image/gif. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box), media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), text_template, playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here.
+**Inspector (right ~280px):** slot only — id, label, x y w h z (sync with the box: typing updates the box live; **`PUT /api/slots/{id}` on change/blur**, same as pointerup). media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), text_template, playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 
 If `/api/state` polling fails, a full-window down banner: application not running.
 
