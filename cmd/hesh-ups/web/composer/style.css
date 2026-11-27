@@ -17,22 +17,36 @@ html, body {
   background: #171717;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
-.top h1 { margin: 0; font-size: 14px; }
+.icon {
+  width: 1em;
+  height: 1em;
+  stroke: currentColor;
+  fill: none;
+  vertical-align: -0.15em;
+  flex-shrink: 0;
+}
+.top h1 { margin: 0; font-size: 14px; display: inline-flex; align-items: center; gap: 0.35em; }
 .top button, .inspector button, .inspector input, .inspector select, .inspector textarea {
   background: #111;
   color: #eee;
   border: 1px solid rgba(255, 255, 255, 0.08);
   font: inherit;
 }
+.top button, .inspector button, #add-slot {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+}
 .top label { color: #99aab5; font-size: 12px; }
-.pill { color: #99aab5; font-size: 12px; }
+.pill { color: #99aab5; font-size: 12px; display: inline-flex; align-items: center; gap: 0.35em; }
+.layers-head span { display: inline-flex; align-items: center; gap: 0.35em; }
 .pill.on { color: #0ff; }
 
 .panes { display: flex; height: calc(100% - 42px); }
 .layers { width: 240px; background: #171717; border-right: 1px solid rgba(255, 255, 255, 0.08); display: flex; flex-direction: column; }
 .layers-head { display: flex; justify-content: space-between; padding: 8px; }
 #layer-list { list-style: none; margin: 0; padding: 0; overflow: auto; }
-#layer-list li { display: flex; gap: 6px; padding: 6px 8px; cursor: pointer; }
+#layer-list li { display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer; }
 #layer-list li.sel { outline: 1px solid rgba(0, 255, 255, 0.45); }
 .inspector { width: 280px; background: #171717; border-left: 1px solid rgba(255, 255, 255, 0.08); padding: 8px; overflow: auto; }
 .inspector label { display: block; font-size: 12px; color: #99aab5; margin-top: 8px; }
@@ -74,4 +88,4 @@ html, body {
 .handle.ne { top: -4px; right: -4px; cursor: nesw-resize; }
 .handle.sw { bottom: -4px; left: -4px; cursor: nesw-resize; }
 .handle.se { bottom: -4px; right: -4px; cursor: nwse-resize; }
-.hint { position: absolute; color: #99aab5; }
+.hint { position: absolute; color: #99aab5; display: flex; align-items: center; gap: 0.35em; }

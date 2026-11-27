@@ -9,6 +9,23 @@
   var inspector = document.getElementById("inspector");
   var hint = document.getElementById("empty-hint");
 
+  function icon(name) {
+    return '<svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-' + name + '"></use></svg>';
+  }
+
+  function kindIcon(s) {
+    if (s.media_kind === "image" || s.media_kind === "gif") return "photo";
+    if (s.media_kind === "video") return "movie";
+    if (s.media_kind === "audio") return "volume";
+    return "letter-t";
+  }
+
+  function setObsPill(connected) {
+    var el = document.getElementById("obs-pill");
+    el.className = "pill" + (connected ? " on" : "");
+    el.innerHTML = icon(connected ? "video" : "video-off") + (connected ? " OBS: connected" : " OBS: disconnected");
+  }
+
   function origin() {
     return location.origin;
   }
@@ -88,8 +105,7 @@
   }
 
   function render() {
-    document.getElementById("obs-pill").textContent = state.obs && state.obs.connected ? "OBS: connected" : "OBS: disconnected";
-    document.getElementById("obs-pill").className = "pill" + (state.obs && state.obs.connected ? " on" : "");
+    setObsPill(state.obs && state.obs.connected);
     document.getElementById("btn720").className = state.canvas.w === 1280 ? "on" : "";
     document.getElementById("btn1080").className = state.canvas.w === 1920 ? "on" : "";
     hint.style.display = state.slots.length ? "none" : "block";
@@ -99,7 +115,7 @@
     ordered.forEach(function (s) {
       var li = document.createElement("li");
       if (s.id === sel) li.className = "sel";
-      li.innerHTML = '<button type="button" data-eye="' + s.id + '">' + (s.enabled ? "eye" : "off") + "</button><span>" + s.label + "</span>";
+      li.innerHTML = '<button type="button" data-eye="' + s.id + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span>" + s.label + "</span>";
       li.addEventListener("click", function (e) {
         if (e.target.getAttribute("data-eye")) return;
         sel = s.id;
@@ -159,14 +175,14 @@
       '<label>duration_ms <input id="f-dur" type="number" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
       '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>' +
       '<label>css_class <input id="f-css" value="' + (s.css_class || "") + '"></label>' +
-      '<p><button type="button" id="f-save">Save</button> <button type="button" id="f-test">Test</button> <button type="button" id="f-copy">Copy trigger URL</button> <button type="button" id="f-del">Trash</button></p>' +
+      '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> <button type="button" id="f-test">' + icon("player-play") + " Test</button> <button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> <button type="button" id="f-del">' + icon("trash") + " Trash</button></p>" +
       '<label>OBS host <input id="obs-host"></label>' +
       '<label>OBS port <input id="obs-port"></label>' +
       '<label>OBS password <input id="obs-pass" type="password"></label>' +
       '<label>source name <input id="obs-src"></label>' +
-      '<p><button type="button" id="obs-browser">Create/update Browser Source</button></p>' +
+      '<p><button type="button" id="obs-browser">' + icon("browser") + " Create/update Browser Source</button></p>" +
       '<label>scene <select id="obs-scene"></select></label>' +
-      '<p><button type="button" id="obs-switch">Switch scene</button></p>' +
+      '<p><button type="button" id="obs-switch">' + icon("layers-intersect") + " Switch scene</button></p>" +
       '<label><input type="checkbox" id="autostart"> Run at login</label>';
     document.getElementById("f-kind").value = s.media_kind;
     document.getElementById("f-play").value = s.playback;
@@ -226,7 +242,9 @@
   inspector.addEventListener("click", function (e) {
     var s = slotById(sel);
     if (!s) return;
-    if (e.target.id === "f-save") {
+    var btn = e.target.closest("button");
+    var id = btn ? btn.id : e.target.id;
+    if (id === "f-save") {
       var body = readForm(s);
       if (!body) return;
       if (body.id !== s.id) {
@@ -237,16 +255,16 @@
       }
       saveSlot(body);
     }
-    if (e.target.id === "f-test") {
+    if (id === "f-test") {
       fetch("/api/popup/" + encodeURIComponent(s.id) + "?user=Ada", { method: "POST" });
     }
-    if (e.target.id === "f-copy") {
+    if (id === "f-copy") {
       navigator.clipboard.writeText(origin() + "/api/popup/" + encodeURIComponent(s.id));
     }
-    if (e.target.id === "f-del") {
+    if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
     }
-    if (e.target.id === "obs-browser") {
+    if (id === "obs-browser") {
       fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
         obs_host: document.getElementById("obs-host").value,
         obs_port: document.getElementById("obs-port").value,
@@ -254,7 +272,7 @@
         obs_browser_source: document.getElementById("obs-src").value,
       }) }).then(function () { return fetch("/api/obs/browser-source", { method: "POST" }); });
     }
-    if (e.target.id === "obs-switch") {
+    if (id === "obs-switch") {
       var name = document.getElementById("obs-scene").value;
       fetch("/api/obs/scene/" + encodeURIComponent(name), { method: "POST" });
     }
@@ -277,7 +295,8 @@
   });
 
   list.addEventListener("click", function (e) {
-    var id = e.target.getAttribute("data-eye");
+    var eye = e.target.closest("[data-eye]");
+    var id = eye && eye.getAttribute("data-eye");
     if (!id) return;
     var s = slotById(id);
     s.enabled = !s.enabled;
@@ -381,8 +400,7 @@
   load().then(function () {
     setInterval(function () {
       fetch("/api/state").then(function (r) { return r.json(); }).then(function (s) {
-        document.getElementById("obs-pill").textContent = s.obs && s.obs.connected ? "OBS: connected" : "OBS: disconnected";
-        document.getElementById("obs-pill").className = "pill" + (s.obs && s.obs.connected ? " on" : "");
+        setObsPill(s.obs && s.obs.connected);
       });
     }, 2000);
   });

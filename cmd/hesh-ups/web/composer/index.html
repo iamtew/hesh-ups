@@ -8,21 +8,21 @@
   </head>
   <body>
     <header class="top">
-      <h1>Composer</h1>
-      <button type="button" id="btn720">720p</button>
-      <button type="button" id="btn1080">1080p</button>
+      <h1><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-layout-board"></use></svg> Composer</h1>
+      <button type="button" id="btn720"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-tv"></use></svg> 720p</button>
+      <button type="button" id="btn1080"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-device-desktop"></use></svg> 1080p</button>
       <label><input type="checkbox" id="grid-thirds" /> thirds</label>
       <label><input type="checkbox" id="grid-center" /> center</label>
       <label><input type="checkbox" id="grid-safe" /> safe</label>
       <label><input type="checkbox" id="snap" checked /> Snap</label>
-      <button type="button" id="copy-overlay">Copy overlay URL</button>
-      <span id="obs-pill" class="pill">OBS: disconnected</span>
+      <button type="button" id="copy-overlay"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-copy"></use></svg> Copy overlay URL</button>
+      <span id="obs-pill" class="pill"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-video-off"></use></svg> OBS: disconnected</span>
     </header>
     <div class="panes">
       <aside class="layers">
         <div class="layers-head">
-          <span>Layers</span>
-          <button type="button" id="add-slot">+</button>
+          <span><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-stack-2"></use></svg> Layers</span>
+          <button type="button" id="add-slot" aria-label="Add slot"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg></button>
         </div>
         <ul id="layer-list"></ul>
       </aside>
@@ -31,7 +31,7 @@
           <svg id="grid"></svg>
           <div id="boxes"></div>
         </div>
-        <p id="empty-hint" class="hint">Add a slot to start.</p>
+        <p id="empty-hint" class="hint"><svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-plus"></use></svg> Add a slot to start.</p>
       </div>
       <aside class="inspector" id="inspector">
         <p class="muted">Select a slot</p>
