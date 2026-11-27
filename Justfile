@@ -37,6 +37,27 @@ build-dist: package
     $ver = (Get-Content VERSION -Raw).Trim(); Compress-Archive -Path dist/hesh-ups.exe -DestinationPath "dist/hesh-ups-$ver-win-x64.zip" -Force
     @just msi-only
 
+icon: icon-docs icon-web icon-app
+
+icon-docs:
+    if (-not (Get-Command magick -ErrorAction SilentlyContinue)) { Write-Error "magick not on PATH"; exit 1 }
+    if (-not (Test-Path docs/img)) { New-Item -ItemType Directory -Path docs/img | Out-Null }
+    Copy-Item -Force assets/logo.png docs/img/logo.png
+    magick assets/logo.png -define icon:auto-resize=48,32,16 docs/favicon.ico
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+icon-web:
+    if (-not (Get-Command magick -ErrorAction SilentlyContinue)) { Write-Error "magick not on PATH"; exit 1 }
+    magick assets/logo.png -resize 32x32 cmd/hesh-ups/web/composer/favicon.png
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+icon-app:
+    if (-not (Get-Command magick -ErrorAction SilentlyContinue)) { Write-Error "magick not on PATH"; exit 1 }
+    magick assets/logo.png -define icon:auto-resize=256,48,32,16 cmd/hesh-ups/icon.ico
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    go run github.com/akavel/rsrc@v0.10.2 -arch amd64 -ico cmd/hesh-ups/icon.ico -o cmd/hesh-ups/rsrc_windows_amd64.syso
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 clean:
     go clean
     if (Test-Path dist) { Remove-Item -Recurse -Force dist }
