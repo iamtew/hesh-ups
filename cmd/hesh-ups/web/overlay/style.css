@@ -10,7 +10,6 @@ html, body {
   position: absolute;
   left: 0;
   top: 0;
-  transform-origin: 0 0;
 }
 
 .slot {
@@ -32,6 +31,11 @@ html, body {
 .slot.is-on {
   opacity: 1;
   transform: none;
+}
+
+/* Video/audio under a fading or transformed slot never paint. */
+.slot[data-flat="1"] {
+  transition: none;
 }
 
 .slot img, .slot video {

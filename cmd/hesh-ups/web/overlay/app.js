@@ -24,7 +24,8 @@
   document.addEventListener("pointerdown", unlockAudio);
   document.addEventListener("keydown", unlockAudio);
 
-  // Canvas stays in canvas pixels. Scale fits the viewport (OBS at canvas size is 1:1).
+  // Canvas stays in canvas pixels. zoom fits the viewport (OBS at canvas size is 1:1).
+  // A CSS transform on an ancestor blanks <video> in WebView2 and OBS.
   function fitCanvas() {
     if (canvasW <= 0 || canvasH <= 0) return;
     canvas.style.width = canvasW + "px";
@@ -33,7 +34,10 @@
     if (!isFinite(s) || s <= 0) s = 1;
     var ox = Math.round((window.innerWidth - canvasW * s) / 2);
     var oy = Math.round((window.innerHeight - canvasH * s) / 2);
-    canvas.style.transform = "translate(" + ox + "px," + oy + "px) scale(" + s + ")";
+    canvas.style.transform = "";
+    canvas.style.left = ox + "px";
+    canvas.style.top = oy + "px";
+    canvas.style.zoom = s === 1 ? "" : String(s);
   }
   window.addEventListener("resize", fitCanvas);
 
@@ -165,17 +169,34 @@
       if (msg.playback !== "loop" && ended) {
         el.addEventListener("ended", ended);
       }
-      function kick() {
+      function queue() {
+        if (pendingSound.indexOf(el) < 0) pendingSound.push(el);
+      }
+      // Muted play first so the picture starts. Unmute is a second play();
+      // if that is blocked, go back to muted so the frames keep going.
+      function loud() {
+        if (el._heshLoud) return;
+        el._heshLoud = true;
+        el.muted = false;
+        el.volume = vol;
         var p = el.play();
-        function loud() {
-          el.muted = false;
-          el.volume = vol;
-          if (!audioUnlocked) pendingSound.push(el);
-        }
         if (p && p.then) {
-          p.then(loud).catch(function () {
-            pendingSound.push(el);
+          p.catch(function () {
+            el.muted = true;
+            el.volume = 0;
+            var again = el.play();
+            if (again && again.catch) again.catch(function () {});
+            queue();
           });
+        }
+      }
+      function kick() {
+        if (el._heshLoud) return;
+        el.muted = true;
+        el.volume = 0;
+        var p = el.play();
+        if (p && p.then) {
+          p.then(loud).catch(queue);
         } else {
           loud();
         }
@@ -200,6 +221,19 @@
     }
   }
 
+  // Opacity or transform on an ancestor blanks video/audio in WebView2/CEF.
+  function flatMedia(msg) {
+    var kind = msg.media_kind;
+    if (kind === "video" || kind === "audio") return true;
+    if (kind !== "group") return false;
+    var members = msg.members || [];
+    for (var i = 0; i < members.length; i++) {
+      var k = members[i].media_kind;
+      if (k === "video" || k === "audio") return true;
+    }
+    return false;
+  }
+
   function show(msg) {
     var id = msg.id || msg.slot;
     hideGen[id] = (hideGen[id] || 0) + 1;
@@ -211,6 +245,13 @@
     n.setAttribute("data-kind", kind || "");
     var mot = (msg.look && msg.look.motion) || (slots[id] && slots[id].look && slots[id].look.motion) || "fade";
     n.setAttribute("data-motion", mot);
+    if (flatMedia(msg)) {
+      n.setAttribute("data-flat", "1");
+      n.classList.add("is-on");
+      void n.offsetWidth;
+    } else {
+      n.removeAttribute("data-flat");
+    }
     if (kind === "group") {
       var once = 0;
       (msg.members || []).forEach(function (m) {
