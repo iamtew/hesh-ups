@@ -9,8 +9,6 @@
   var ws;
   var audioUnlocked = /OBS/i.test(navigator.userAgent);
   var pendingSound = [];
-  // Tray preview only. OBS loads /overlay/ with no query and stays empty until fire.
-  var preview = /[?&]preview=1(?:&|$)/.test(location.search);
 
   function unlockAudio() {
     audioUnlocked = true;
@@ -60,7 +58,6 @@
         }
         fitCanvas();
         Object.keys(nodes).forEach(place);
-        previewRefresh();
         return;
       }
       if (msg.type === "snapshot") {
@@ -70,11 +67,8 @@
           show(v);
         });
         Object.keys(nodes).forEach(function (id) {
-          if (keep[id]) return;
-          if (nodes[id]) nodes[id].removeAttribute("data-program");
-          hide(id);
+          if (!keep[id]) hide(id);
         });
-        previewRefresh();
         return;
       }
       if (msg.type === "show") {
@@ -82,17 +76,11 @@
         return;
       }
       if (msg.type === "stop") {
-        if (nodes[msg.slot]) nodes[msg.slot].removeAttribute("data-program");
         hide(msg.slot);
-        previewRefresh();
         return;
       }
       if (msg.type === "clear") {
-        Object.keys(nodes).forEach(function (id) {
-          if (nodes[id]) nodes[id].removeAttribute("data-program");
-          hide(id);
-        });
-        previewRefresh();
+        Object.keys(nodes).forEach(hide);
       }
     };
     ws.onclose = function () {
@@ -124,76 +112,6 @@
     if (ws && ws.readyState === 1) {
       ws.send(JSON.stringify({ type: "ended", slot: slot, seq: seq }));
     }
-  }
-
-  function esc(s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c];
-    });
-  }
-
-  function slotOn(s) {
-    return !!s && s.enabled !== false && s.enabled !== 0 && s.enabled !== "0";
-  }
-
-  function sampleText(tmpl) {
-    var filled = String(tmpl || "").replace(/\{([A-Za-z_][A-Za-z0-9_]*)\}/g, function (_, name) {
-      return name === "user" ? "Ada" : "";
-    });
-    return esc(filled);
-  }
-
-  function mediaURL(s) {
-    if (!s || s.media_kind === "text" || s.media_kind === "group" || !s.media_path) return "";
-    return "/media/" + s.media_path;
-  }
-
-  function sampleMember(c) {
-    return {
-      id: c.id, media_kind: c.media_kind, media_url: mediaURL(c), playback: c.playback,
-      volume: 0, text: sampleText(c.text_template), theme: c.theme || "plain", look: c.look,
-      x: c.x, y: c.y, w: c.w, h: c.h, z: c.z, _sample: true,
-    };
-  }
-
-  function sampleMsg(s) {
-    var msg = {
-      id: s.id, media_kind: s.media_kind, media_url: mediaURL(s), playback: s.playback,
-      volume: 0, text: sampleText(s.text_template), theme: s.theme || "plain", look: s.look,
-      _sample: true, seq: 0,
-    };
-    if (s.media_kind === "group") {
-      msg.members = Object.keys(slots).map(function (id) { return slots[id]; }).filter(function (c) {
-        return c.parent_id === s.id && slotOn(c);
-      }).map(sampleMember);
-      msg.media_url = "";
-      msg.text = "";
-    }
-    return msg;
-  }
-
-  function previewRefresh() {
-    if (!preview) return;
-    Object.keys(slots).forEach(function (id) {
-      var s = slots[id];
-      if (!s || s.parent_id) return;
-      var n = nodes[id];
-      if (n && n.getAttribute("data-program") === "1" && n.classList.contains("is-on")) return;
-      if (!slotOn(s)) {
-        if (n) hide(id);
-        return;
-      }
-      if (s.media_kind === "group") {
-        var any = Object.keys(slots).some(function (cid) {
-          return slots[cid].parent_id === id && slotOn(slots[cid]);
-        });
-        if (!any) {
-          if (n) hide(id);
-          return;
-        }
-      }
-      show(sampleMsg(s));
-    });
   }
 
   function place(id) {
@@ -250,18 +168,13 @@
       function kick() {
         var p = el.play();
         function loud() {
-          if (msg._sample) {
-            el.muted = true;
-            el.volume = 0;
-            return;
-          }
           el.muted = false;
           el.volume = vol;
           if (!audioUnlocked) pendingSound.push(el);
         }
         if (p && p.then) {
           p.then(loud).catch(function () {
-            if (!msg._sample) pendingSound.push(el);
+            pendingSound.push(el);
           });
         } else {
           loud();
@@ -291,8 +204,6 @@
     var id = msg.id || msg.slot;
     hideGen[id] = (hideGen[id] || 0) + 1;
     var n = nodeFor(id);
-    if (msg._sample) n.removeAttribute("data-program");
-    else n.setAttribute("data-program", "1");
     stopThemes(n);
     n.innerHTML = "";
     n.removeAttribute("data-theme");
@@ -316,7 +227,7 @@
         child.style.height = (m.h || 32) + "px";
         child.style.zIndex = String(m.z || 0);
         var ended = null;
-        if (!msg._sample && (m.media_kind === "video" || m.media_kind === "audio") && m.playback !== "loop") {
+        if ((m.media_kind === "video" || m.media_kind === "audio") && m.playback !== "loop") {
           ended = function () {
             left.n--;
             if (left.n <= 0) sendEnded(id, msg.seq);
@@ -327,7 +238,7 @@
       });
     } else {
       var ended = null;
-      if (!msg._sample && (kind === "video" || kind === "audio") && msg.playback !== "loop") {
+      if ((kind === "video" || kind === "audio") && msg.playback !== "loop") {
         ended = function () { sendEnded(id, msg.seq); };
       }
       fillKind(n, msg, ended);

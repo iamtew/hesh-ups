@@ -6,7 +6,7 @@ The stage is a **plot**: named dashed boxes for where popups live. It is not the
 
 - Click a layer or box to **preview** that graphic (sample `{user}` → Ada, same as **Test**). Select a group to preview the whole group.
 - **Test** takes it to **program** (same fire URL as Streamer.bot). Green mark = on air. **Stop** / duration / clip end takes it down. The plot box stays unless you deselect.
-- Tray **Overlay preview** draws enabled slots (sample `{user}` Ada, muted) until a live fire. The OBS Browser Source is program only: empty until fire. Grid, handles, names, and GROUP tags are composer chrome — never drawn in OBS.
+- Tray **Overlay preview** and the OBS Browser Source are program only: empty until fire. Grid, handles, names, and GROUP tags are composer chrome — never drawn in OBS.
 
 - Each slot is one type: **text**, **image**, **gif**, **video**, **audio**, or **group**. The inspector only shows knobs for that type.
 - **+** adds a text slot. Type is the first inspector control. Text gets a template plus a theme (plain or glass), plus size, weight, fill, stroke, align, and fit (shrink long names into the box). Media types get a file; video/audio also get playback and volume. Fireable slots pick motion: fade, slide, or scale.

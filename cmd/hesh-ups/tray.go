@@ -114,9 +114,9 @@ func onReady(s *Server) {
 			case <-mTriggersWeb.ClickedCh:
 				openBrowser(base + "/triggers/")
 			case <-mOverlayWin.ClickedCh:
-				go openView("Overlay", base+"/overlay/?preview=1", 1280, 720)
+				go openView("Overlay", base+"/overlay/", 1280, 720)
 			case <-mOverlayWeb.ClickedCh:
-				openBrowser(base + "/overlay/?preview=1")
+				openBrowser(base + "/overlay/")
 			case <-mAuto.ClickedCh:
 				on := !mAuto.Checked()
 				if on {
