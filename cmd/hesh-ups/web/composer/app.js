@@ -344,47 +344,86 @@
     return esc(filled);
   }
 
+  function slotLive(s) {
+    if (!s) return false;
+    if (s.visible) return true;
+    var p = s.parent_id ? slotById(s.parent_id) : null;
+    return !!(p && p.visible);
+  }
+
+  function slotPreview(s) {
+    if (!s || !sel) return false;
+    if (s.id === sel) return true;
+    return !!(s.parent_id && s.parent_id === sel);
+  }
+
+  function slotFilled(s) {
+    return slotLive(s) || slotPreview(s);
+  }
+
+  function paintSlot(s) {
+    if (!s) return;
+    var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
+    if (el) fillBox(el, s);
+    var li = list.querySelector('li[data-id="' + s.id + '"]');
+    if (li) li.classList.toggle("live", slotLive(s));
+  }
+
+  function paintSlotTree(s) {
+    paintSlot(s);
+    if (s && s.media_kind === "group") membersOf(s.id).forEach(paintSlot);
+  }
+
   function fillBox(el, s) {
     stopThemes(el);
     var parent = s.parent_id ? slotById(s.parent_id) : null;
-    var live = !!s.visible || (parent && parent.visible);
+    var live = slotLive(s);
     var host = !!(sel && slotById(sel) && slotById(sel).parent_id === s.id);
+    var filled = slotFilled(s);
     el.className = "box popup"
       + (s.id === sel ? " sel" : "")
       + (live ? " live" : "")
+      + (filled ? " filled" : " plot")
       + (s.media_kind === "group" ? " group" : "")
       + (parent ? " child" : "")
       + (host ? " host" : "");
-    el.querySelectorAll("img, video, .banner-content, .chrome-tag").forEach(function (n) { n.remove(); });
+    el.removeAttribute("data-theme");
+    el.querySelectorAll("img, video, .banner-content, .chrome-tag, .chrome-name").forEach(function (n) { n.remove(); });
     var before = el.querySelector(".handle");
     function add(node) {
       if (before) el.insertBefore(node, before);
       else el.appendChild(node);
     }
-    if (s.media_kind === "image" || s.media_kind === "gif") {
-      var img = document.createElement("img");
-      img.src = "/media/" + s.media_path;
-      add(img);
-    } else if (s.media_kind === "video" && s.media_path) {
-      var v = document.createElement("video");
-      v.muted = true;
-      v.autoplay = true;
-      v.src = "/media/" + s.media_path;
-      if (s.playback === "loop") v.loop = true;
-      add(v);
-    } else if (s.media_kind === "text") {
-      var theme = s.theme || "plain";
-      el.setAttribute("data-theme", theme);
-      var wrap = document.createElement("div");
-      wrap.className = "banner-content" + (theme === "plain" ? "" : " theme-panel");
-      var t = document.createElement("div");
-      t.className = "banner-text";
-      t.innerHTML = previewText(s.text_template);
-      wrap.appendChild(t);
-      add(wrap);
-      var fx = themeFx();
-      if (theme !== "plain" && fx[theme] && fx[theme].start) fx[theme].start(wrap);
+    if (filled) {
+      if (s.media_kind === "image" || s.media_kind === "gif") {
+        var img = document.createElement("img");
+        img.src = "/media/" + s.media_path;
+        add(img);
+      } else if (s.media_kind === "video" && s.media_path) {
+        var v = document.createElement("video");
+        v.muted = true;
+        v.autoplay = true;
+        v.src = "/media/" + s.media_path;
+        if (s.playback === "loop") v.loop = true;
+        add(v);
+      } else if (s.media_kind === "text") {
+        var theme = s.theme || "plain";
+        el.setAttribute("data-theme", theme);
+        var wrap = document.createElement("div");
+        wrap.className = "banner-content" + (theme === "plain" ? "" : " theme-panel");
+        var t = document.createElement("div");
+        t.className = "banner-text";
+        t.innerHTML = previewText(s.text_template);
+        wrap.appendChild(t);
+        add(wrap);
+        var fx = themeFx();
+        if (theme !== "plain" && fx[theme] && fx[theme].start) fx[theme].start(wrap);
+      }
     }
+    var name = document.createElement("div");
+    name.className = "chrome-name";
+    name.textContent = s.label || s.id;
+    add(name);
     if (s.media_kind === "group" || parent) {
       var tag = document.createElement("div");
       tag.className = "chrome-tag";
@@ -418,12 +457,16 @@
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
     if (el) {
       placeBox(el, s);
+      fillBox(el, s);
       if (s.media_kind === "group") {
         membersOf(s.id).forEach(function (c) {
           var cel = el.querySelector(':scope > .box[data-id="' + c.id + '"]');
-          if (cel) placeBox(cel, c);
+          if (cel) {
+            placeBox(cel, c);
+            fillBox(cel, c);
+          }
         });
-      } else if (s.media_kind === "text") fillBox(el, s);
+      }
     }
     var li = list.querySelector('li[data-id="' + s.id + '"]');
     if (li) {
@@ -449,8 +492,7 @@
       if (sel && slotById(sel) && slotById(sel).parent_id === s.id) cls.push("host");
       if (!isOn(s) || (s.parent_id && !isOn(slotById(s.parent_id)))) cls.push("off");
       li.dataset.id = s.id;
-      var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
-      if (live) cls.push("live");
+      if (slotLive(s)) cls.push("live");
       li.className = cls.join(" ");
       var row = document.createElement("div");
       row.className = "row";
@@ -713,16 +755,28 @@
         return fetch(popupURL(fireId(fired), "user=Ada"), { method: "POST" });
       }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
+        var fid = fireId(fired);
+        var fs = slotById(fid);
+        if (fs) {
+          fs.visible = true;
+          paintSlotTree(fs);
+        }
         var sticky = (fired.duration_ms == null || fired.duration_ms <= 0) && fired.media_kind !== "video" && fired.media_kind !== "audio" && fired.media_kind !== "group";
-        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fireId(fired));
+        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fid);
       }).catch(function (err) {
         if (!err || !err.save) setStatus("Fire failed");
       });
     }
     if (id === "f-hide") {
       fetch(origin() + "/api/popup/" + encodeURIComponent(fireId(s)) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
-        if (r.ok) setStatus("Hidden " + fireId(s));
-        else errMsg(r).then(setStatus);
+        if (r.ok) {
+          var hid = slotById(fireId(s));
+          if (hid) {
+            hid.visible = false;
+            paintSlotTree(hid);
+          }
+          setStatus("Hidden " + fireId(s));
+        } else errMsg(r).then(setStatus);
       }).catch(function () { setStatus("Hide failed"); });
     }
     if (id === "f-copy") {
@@ -829,8 +883,11 @@
   });
   document.getElementById("hide-all").addEventListener("click", function () {
     fetch(origin() + "/api/popup/hide_all" + tokenQuery(), { method: "POST" }).then(function (r) {
-      if (r.ok) setStatus("Hidden all");
-      else errMsg(r).then(setStatus);
+      if (r.ok) {
+        state.slots.forEach(function (sl) { sl.visible = false; });
+        state.slots.filter(function (sl) { return !sl.parent_id; }).forEach(paintSlotTree);
+        setStatus("Hidden all");
+      } else errMsg(r).then(setStatus);
     }).catch(function () { setStatus("Hide all failed"); });
   });
   document.getElementById("btn720").addEventListener("click", function () {
@@ -1009,13 +1066,11 @@
         state.obs = s.obs;
         (s.slots || []).forEach(function (sl) {
           var cur = slotById(sl.id);
-          if (cur) cur.visible = !!sl.visible;
-        });
-        document.querySelectorAll("#layer-list li, #boxes .box").forEach(function (el) {
-          var cur = slotById(el.dataset.id);
           if (!cur) return;
-          var live = !!cur.visible || (cur.parent_id && slotById(cur.parent_id) && slotById(cur.parent_id).visible);
-          el.classList.toggle("live", live);
+          var on = !!sl.visible;
+          if (!!cur.visible === on) return;
+          cur.visible = on;
+          paintSlotTree(cur);
         });
         setObsPill(s.obs && s.obs.connected);
         fillScenes(s.obs);

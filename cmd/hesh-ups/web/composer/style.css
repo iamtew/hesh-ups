@@ -144,6 +144,10 @@ body.admin input[type="checkbox"] { width: auto; }
   overflow: hidden;
   user-select: none;
 }
+.box.plot {
+  outline: 1px dashed rgba(230, 230, 230, 0.4);
+  background: rgba(255, 255, 255, 0.04);
+}
 .box.sel { outline: 1px solid rgba(0, 255, 255, 0.45); }
 .box img, .box video, .box .banner-content {
   width: 100%;
@@ -169,6 +173,17 @@ body.admin input[type="checkbox"] { width: auto; }
   letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--accent); background: #111c;
   pointer-events: none;
+}
+.chrome-name {
+  position: absolute; bottom: 4px; left: 4px; z-index: 2;
+  padding: 2px 6px;
+  font: 700 10px/1 Segoe UI, sans-serif;
+  color: var(--text); background: #111c;
+  pointer-events: none;
+  max-width: calc(100% - 8px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .box.child .chrome-tag { color: var(--accent2); }
 .handle {
