@@ -1,6 +1,6 @@
 # HTTP
 
-Bind `127.0.0.1:18745`. GET and POST both work on fire/hide so “open URL” clients work. Copy those URLs from the [board](board.md) (tray **Board**).
+Bind `127.0.0.1:18745`. GET and POST both work on fire/hide so “open URL” clients work. Copy those URLs from [triggers](triggers.md) (tray **Triggers**).
 
 - Fire: `GET /api/popup/{id}?user=Ada` (group id fires the whole group; member ids 404)
 - Hide: `/api/popup/{id}/hide`

@@ -19,4 +19,4 @@ Go module `github.com/iamtew/hesh-ups`. One binary: `./cmd/hesh-ups`. Pinned dep
 
 `systray.Run` is `main()`. Tests MUST NOT start systray, WebView, or `Listen` on the product port. Use `httptest` + temp `HESH_UPS_DB`.
 
-No `internal/` until a second binary exists. Overlay/composer/board stay embedded (`//go:embed all:web`). Pages stay `docs/` on `master`.
+No `internal/` until a second binary exists. Overlay/composer/triggers stay embedded (`//go:embed all:web`). Pages stay `docs/` on `master`.

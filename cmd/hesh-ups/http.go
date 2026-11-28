@@ -102,14 +102,16 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /ws", s.handleWS)
 	mux.HandleFunc("GET /overlay", redirectSlash)
 	mux.HandleFunc("GET /composer", redirectSlash)
-	mux.HandleFunc("GET /board", redirectSlash)
+	mux.HandleFunc("GET /triggers", redirectSlash)
+	mux.HandleFunc("GET /board", redirectTriggers)
+	mux.HandleFunc("GET /board/", redirectTriggers)
 	overlay, _ := fs.Sub(webFS, "web/overlay")
 	composer, _ := fs.Sub(webFS, "web/composer")
-	board, _ := fs.Sub(webFS, "web/board")
+	triggers, _ := fs.Sub(webFS, "web/triggers")
 	shared, _ := fs.Sub(webFS, "web/shared")
 	mux.Handle("/overlay/", http.StripPrefix("/overlay/", http.FileServer(http.FS(overlay))))
 	mux.Handle("/composer/", http.StripPrefix("/composer/", http.FileServer(http.FS(composer))))
-	mux.Handle("/board/", http.StripPrefix("/board/", http.FileServer(http.FS(board))))
+	mux.Handle("/triggers/", http.StripPrefix("/triggers/", http.FileServer(http.FS(triggers))))
 	mux.Handle("/shared/", http.StripPrefix("/shared/", http.FileServer(http.FS(shared))))
 	mux.HandleFunc("GET /media/", s.handleMediaFile)
 	return mux
@@ -117,6 +119,10 @@ func (s *Server) Handler() http.Handler {
 
 func redirectSlash(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, r.URL.Path+"/", http.StatusMovedPermanently)
+}
+
+func redirectTriggers(w http.ResponseWriter, r *http.Request) {
+	http.Redirect(w, r, "/triggers/", http.StatusMovedPermanently)
 }
 
 func writeErr(w http.ResponseWriter, code int, key, msg string) {

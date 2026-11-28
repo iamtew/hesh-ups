@@ -4,7 +4,7 @@
     { id: "running", title: "Running", group: "Start", icon: "player-play" },
     { id: "credits", title: "Credits", group: "Start", icon: "certificate" },
     { id: "composer", title: "Composer", group: "Surfaces", icon: "layout-board" },
-    { id: "board", title: "Board", group: "Surfaces", icon: "player-play" },
+    { id: "triggers", title: "Triggers", group: "Surfaces", icon: "player-play" },
     { id: "overlay", title: "Overlay", group: "Surfaces", icon: "stack-2" },
     { id: "http", title: "HTTP", group: "Build", icon: "world" },
     { id: "obs", title: "OBS", group: "Build", icon: "video" },

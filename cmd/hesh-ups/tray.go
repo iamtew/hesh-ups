@@ -21,7 +21,7 @@ var (
 	viewMu     sync.Mutex
 	composerWV webview2.WebView
 	overlayWV  webview2.WebView
-	boardWV    webview2.WebView
+	triggersWV webview2.WebView
 )
 
 //go:embed icon.ico
@@ -51,12 +51,12 @@ func onReady(s *Server) {
 	}
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
-	mBoard := systray.AddMenuItem("Board", "Open board")
-	setMenuIcon(mBoard, "app-window")
-	mBoardWin := mBoard.AddSubMenuItem("Open window", "Open board WebView")
-	setMenuIcon(mBoardWin, "app-window")
-	mBoardWeb := mBoard.AddSubMenuItem("Open in browser", "Open board in browser")
-	setMenuIcon(mBoardWeb, "world")
+	mTriggers := systray.AddMenuItem("Triggers", "Open triggers")
+	setMenuIcon(mTriggers, "app-window")
+	mTriggersWin := mTriggers.AddSubMenuItem("Open window", "Open triggers WebView")
+	setMenuIcon(mTriggersWin, "app-window")
+	mTriggersWeb := mTriggers.AddSubMenuItem("Open in browser", "Open triggers in browser")
+	setMenuIcon(mTriggersWeb, "world")
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
 	setMenuIcon(mComposer, "layout-board")
 	mComposerWin := mComposer.AddSubMenuItem("Open window", "Open composer WebView")
@@ -105,10 +105,10 @@ func onReady(s *Server) {
 	go func() {
 		for {
 			select {
-			case <-mBoardWin.ClickedCh:
-				go openView("Board", base+"/board/", 640, 760)
-			case <-mBoardWeb.ClickedCh:
-				openBrowser(base + "/board/")
+			case <-mTriggersWin.ClickedCh:
+				go openView("Triggers", base+"/triggers/", 640, 760)
+			case <-mTriggersWeb.ClickedCh:
+				openBrowser(base + "/triggers/")
 			case <-mComposerWin.ClickedCh:
 				go openView("Composer", base+"/composer/", 1280, 800)
 			case <-mComposerWeb.ClickedCh:
@@ -149,7 +149,7 @@ func openBrowser(url string) {
 
 func closeViews() {
 	viewMu.Lock()
-	cvs := []webview2.WebView{composerWV, overlayWV, boardWV}
+	cvs := []webview2.WebView{composerWV, overlayWV, triggersWV}
 	viewMu.Unlock()
 	for _, wv := range cvs {
 		if wv == nil {
@@ -164,8 +164,8 @@ func liveView(title string) *webview2.WebView {
 	switch title {
 	case "Composer":
 		return &composerWV
-	case "Board":
-		return &boardWV
+	case "Triggers":
+		return &triggersWV
 	default:
 		return &overlayWV
 	}

@@ -1,6 +1,6 @@
-# Board
+# Triggers
 
-Open from the tray (WebView or system browser): `http://127.0.0.1:18745/board/`.
+Open from the tray (WebView or system browser): `http://127.0.0.1:18745/triggers/`.
 
 This is the operate list: every **top-level** slot (a group is one row). It is not the composer plot. Lay out boxes in [composer.md](composer.md); fire them here or from Streamer.bot / Stream Deck using the copied URLs.
 

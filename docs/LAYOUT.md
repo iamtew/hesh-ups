@@ -11,7 +11,7 @@ This bootstrap directory (`scratchpad/hesh-ups-bootstrap/`) is notes. It MUST NO
 ## 1. Intent
 
 - Small repository root. A stranger can name every top-level entry.
-- All Go that ships in the exe in **one** directory, including the overlay/composer/board HTML (`cmd/hesh-ups/web/`).
+- All Go that ships in the exe in **one** directory, including the overlay/composer/triggers HTML (`cmd/hesh-ups/web/`).
 - **`docs/` is the GitHub Pages website** (branch `master`, folder `/docs`). Operator markdown lives *inside* `docs/` so files and the site are the same pages. That GitHub pattern MUST remain.
 - Dist, zip, and per-user MSI come from the root `Justfile`.
 
@@ -128,7 +128,7 @@ docs/
     overview.md
     running.md
     composer.md
-    board.md
+    triggers.md
     overlay.md
     http.md
     obs.md
@@ -149,7 +149,7 @@ docs/
 | `overview.md` | What it is, jobs, links |
 | `running.md` | Install, tray, Browser Source, OBS audio checkbox |
 | `composer.md` | Slots, templates, playback, Test |
-| `board.md` | Fire/hide board, copy trigger URLs |
+| `triggers.md` | Fire/hide list, copy trigger URLs |
 | `overlay.md` | Canvas, overlay page, WebSocket |
 | `http.md` | Trigger URLs, token, hide |
 | `obs.md` | obs-websocket, source setup, scenes |
@@ -182,7 +182,7 @@ cmd/hesh-ups/
       index.html
       style.css
       app.js
-    board/
+    triggers/
       index.html
       style.css
       app.js
@@ -216,16 +216,16 @@ Listen: product `main()` binds `bind:port`; failure logs to stderr and `os.Exit(
 
 ## 7. Process UI — embed `cmd/hesh-ups/web/`
 
-This is the **only** overlay/composer/board source. Compiled into the exe. Not Pages. Not a folder on disk at runtime.
+This is the **only** overlay/composer/triggers source. Compiled into the exe. Not Pages. Not a folder on disk at runtime.
 
 | Repo path | HTTP |
 | --- | --- |
 | `cmd/hesh-ups/web/overlay/` | `/overlay/` (`index.html`, `style.css`, `app.js`) |
-| `cmd/hesh-ups/web/board/` | `/board/` (fire/hide/copy-URL list) |
+| `cmd/hesh-ups/web/triggers/` | `/triggers/` (fire/hide/copy-URL list; `/board/` 301s here) |
 | `cmd/hesh-ups/web/composer/` | `/composer/` (designer chrome: bar, layers, canvas, inspector, settings modal, `favicon.png`) |
 | `cmd/hesh-ups/web/shared/` | `/shared/` (banner.css, themes, vendored Pixi). Overlay and composer both load these. |
 
-`package main` MUST `//go:embed all:web` and serve that `embed.FS`. `just run` / `just test` / dist / MSI all use the same embed. HTTP 301 `/overlay` → `/overlay/`, `/composer` → `/composer/`, and `/board` → `/board/` so relative assets resolve. Composer, overlay, and board are **vanilla** HTML/CSS/JS (hesh-ups.md); no npm in this tree.
+`package main` MUST `//go:embed all:web` and serve that `embed.FS`. `just run` / `just test` / dist / MSI all use the same embed. HTTP 301 `/overlay` → `/overlay/`, `/composer` → `/composer/`, and `/triggers` → `/triggers/` so relative assets resolve. `/board` and `/board/` 301 to `/triggers/`. Composer, overlay, and triggers are **vanilla** HTML/CSS/JS (hesh-ups.md); no npm in this tree.
 
 `GET /media/` is the **data** media folder (next to the DB). Not embedded.
 
@@ -296,7 +296,7 @@ AGENTS.md: `docs/SPEC.md` + this layout; `master`; **ship it** = commit + push; 
 ## 12. Do not “fix”
 
 - Pages stays **`/docs` on `master`**.
-- Overlay/composer/board stay in `cmd/hesh-ups/web/` and **embed**. No disk UI, no AppData skin folder.
+- Overlay/composer/triggers stay in `cmd/hesh-ups/web/` and **embed**. No disk UI, no AppData skin folder.
 - Do not ship `web/` beside the exe.
 - Manual stays `docs/md/` + `docs.html` (no extra SSG).
 - Do not add `internal/` for one binary.
