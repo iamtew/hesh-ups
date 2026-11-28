@@ -5,11 +5,32 @@
   var hideGen = {};
   var proto = location.protocol === "https:" ? "wss:" : "ws:";
   var ws;
+  var audioUnlocked = /OBS/i.test(navigator.userAgent);
+  var pendingSound = [];
+
+  function unlockAudio() {
+    audioUnlocked = true;
+    pendingSound.forEach(function (el) {
+      if (!el.isConnected) return;
+      el.muted = false;
+      el.volume = el._heshVol != null ? el._heshVol : 1;
+      var p = el.play();
+      if (p && p.catch) p.catch(function () {});
+    });
+    pendingSound = [];
+  }
+  document.addEventListener("pointerdown", unlockAudio);
+  document.addEventListener("keydown", unlockAudio);
 
   function connect() {
     ws = new WebSocket(proto + "//" + location.host + "/ws");
     ws.onmessage = function (ev) {
-      var msg = JSON.parse(ev.data);
+      var msg;
+      try {
+        msg = JSON.parse(ev.data);
+      } catch (e) {
+        return;
+      }
       if (msg.type === "pong") return;
       if (msg.type === "config") {
         slots = {};
@@ -117,13 +138,35 @@
     if (kind === "video" || kind === "audio") {
       var el = document.createElement(kind);
       el.autoplay = true;
+      el.playsInline = true;
+      el.setAttribute("playsinline", "");
+      el.setAttribute("webkit-playsinline", "");
+      el.muted = true;
+      el._heshVol = vol;
+      el.volume = 0;
       el.src = (msg.media_url || "") + (msg.seq != null ? "?s=" + msg.seq : "");
-      el.volume = vol;
       if (msg.playback === "loop") el.loop = true;
       if (msg.playback !== "loop" && ended) {
         el.addEventListener("ended", ended);
       }
+      function kick() {
+        var p = el.play();
+        function loud() {
+          el.muted = false;
+          el.volume = vol;
+          if (!audioUnlocked) pendingSound.push(el);
+        }
+        if (p && p.then) {
+          p.then(loud).catch(function () {
+            pendingSound.push(el);
+          });
+        } else {
+          loud();
+        }
+      }
+      el.addEventListener("canplay", kick, { once: true });
       host.appendChild(el);
+      kick();
       return;
     }
     if (kind === "text") {
@@ -202,7 +245,6 @@
       n.querySelectorAll("video, audio").forEach(function (el) {
         el.pause();
         el.removeAttribute("src");
-        el.load();
       });
       n.innerHTML = "";
     }, 220);
