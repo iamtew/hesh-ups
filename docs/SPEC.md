@@ -90,7 +90,7 @@ Stdlib `net/http`, `database/sql`, `embed`. No ORM. No extra HTTP framework. No 
 
 Just for build/test. Do not add a second WS lib or a Wails/Fyne shell.
 
-HTTP server and OBS client run on goroutines. **`systray.Run` is `main()`.** WebView windows open from tray callbacks on that same thread. If WebView2 is missing: a native error dialog, then exit. Do not hang.
+HTTP server and OBS client run on goroutines. **`systray.Run` is `main()`.** The tray click loop must not wait on WebView `Run()` (spawn a goroutine per window). Several surfaces may be open at once; a second Open window for the same surface is a no-op. If WebView2 is missing: a native error dialog, then exit. Do not hang.
 
 Log: append `%APPDATA%\hesh-ups\hesh-ups.log` (or next to `HESH_UPS_DB`). Rotate at 2 MiB, keep one `.log.1`. Stderr still gets bind failures.
 
@@ -560,6 +560,8 @@ Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the 
 - **Exit** — stop HTTP, close DB, quit
 
 Tooltip: `hesh-ups` + version.
+
+Open window must not freeze the rest of the menu: `Run()` blocks that window’s goroutine only.
 
 ---
 

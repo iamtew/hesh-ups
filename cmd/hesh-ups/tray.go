@@ -106,15 +106,15 @@ func onReady(s *Server) {
 		for {
 			select {
 			case <-mBoardWin.ClickedCh:
-				openView("Board", base+"/board/", 640, 760)
+				go openView("Board", base+"/board/", 640, 760)
 			case <-mBoardWeb.ClickedCh:
 				openBrowser(base + "/board/")
 			case <-mComposerWin.ClickedCh:
-				openView("Composer", base+"/composer/", 1280, 800)
+				go openView("Composer", base+"/composer/", 1280, 800)
 			case <-mComposerWeb.ClickedCh:
 				openBrowser(base + "/composer/")
 			case <-mOverlayWin.ClickedCh:
-				openView("Overlay", base+"/overlay/", 1280, 720)
+				go openView("Overlay", base+"/overlay/", 1280, 720)
 			case <-mOverlayWeb.ClickedCh:
 				openBrowser(base + "/overlay/")
 			case <-mAuto.ClickedCh:
@@ -160,34 +160,45 @@ func closeViews() {
 	}
 }
 
+func liveView(title string) *webview2.WebView {
+	switch title {
+	case "Composer":
+		return &composerWV
+	case "Board":
+		return &boardWV
+	default:
+		return &overlayWV
+	}
+}
+
 func openView(title, url string, w, h int) {
+	slot := liveView(title)
+	viewMu.Lock()
+	if *slot != nil {
+		viewMu.Unlock()
+		return
+	}
+	viewMu.Unlock()
 	wv := webview2.New(false)
 	if wv == nil {
 		messageBox("hesh-ups", "WebView2 is required.")
 		os.Exit(1)
 	}
+	viewMu.Lock()
+	if *slot != nil {
+		viewMu.Unlock()
+		wv.Destroy()
+		return
+	}
+	*slot = wv
+	viewMu.Unlock()
 	wv.SetTitle(title)
 	wv.SetSize(w, h, webview2.HintNone)
-	viewMu.Lock()
-	switch title {
-	case "Composer":
-		composerWV = wv
-	case "Board":
-		boardWV = wv
-	default:
-		overlayWV = wv
-	}
-	viewMu.Unlock()
 	wv.Navigate(url)
-	wv.Run()
+	wv.Run() // blocks this goroutine only; click loop uses go openView
 	viewMu.Lock()
-	switch title {
-	case "Composer":
-		composerWV = nil
-	case "Board":
-		boardWV = nil
-	default:
-		overlayWV = nil
+	if *slot == wv {
+		*slot = nil
 	}
 	viewMu.Unlock()
 	wv.Destroy()
