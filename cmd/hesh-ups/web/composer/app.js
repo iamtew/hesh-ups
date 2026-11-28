@@ -8,6 +8,7 @@
   var grid = document.getElementById("grid");
   var list = document.getElementById("layer-list");
   var inspector = document.getElementById("inspector");
+  var inspectorActions = document.getElementById("inspector-actions");
   var hint = document.getElementById("empty-hint");
   var downBanner = document.getElementById("down-banner");
   var settingsOverlay = document.getElementById("settings-overlay");
@@ -550,6 +551,8 @@
     if (!s) {
       document.getElementById("inspector-pane").classList.remove("in-group", "member");
       inspector.innerHTML = '<p class="muted">Select a slot</p>';
+      inspectorActions.hidden = true;
+      inspectorActions.innerHTML = "";
       return;
     }
     var kind = s.media_kind || "text";
@@ -567,11 +570,13 @@
     html +=
       '<label>id <input id="f-id" value="' + esc(s.id) + '"></label>' +
       '<label>label <input id="f-label" value="' + esc(s.label || "") + '"></label>' +
+      '<div class="geom">' +
       '<label>x <input id="f-x" type="number" value="' + s.x + '"></label>' +
       '<label>y <input id="f-y" type="number" value="' + s.y + '"></label>' +
       '<label>w <input id="f-w" type="number" value="' + s.w + '"></label>' +
       '<label>h <input id="f-h" type="number" value="' + s.h + '"></label>' +
-      '<label>z <input id="f-z" type="number" value="' + s.z + '"></label>';
+      '<label class="span">z <input id="f-z" type="number" value="' + s.z + '"></label>' +
+      "</div>";
     if (!child) {
       html += '<label>type <select id="f-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option><option value="group">group</option></select></label>';
     } else {
@@ -605,12 +610,14 @@
       html += '</ul><label>add member <select id="f-add-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option></select></label>';
       html += '<p><button type="button" id="f-add-member">' + icon("plus") + " Add member</button></p>";
     }
-    html += '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> " +
-      '<button type="button" id="f-test">' + icon("player-play") + " Test</button> " +
-      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button> ";
-    if (!child) html += '<button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> ";
-    html += '<button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
     inspector.innerHTML = html;
+    var actions = '<button type="button" id="f-save">' + icon("device-floppy") + " Save</button>" +
+      '<button type="button" id="f-test">' + icon("player-play") + " Test</button>" +
+      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button>";
+    if (!child) actions += '<button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button>";
+    actions += '<button type="button" id="f-del">' + icon("trash") + " Trash</button>";
+    inspectorActions.innerHTML = actions;
+    inspectorActions.hidden = false;
     document.getElementById("f-kind").value = kind;
     var play = document.getElementById("f-play");
     if (play) play.value = s.playback || "once";
@@ -733,7 +740,7 @@
     });
   }
 
-  inspector.addEventListener("click", function (e) {
+  document.getElementById("inspector-pane").addEventListener("click", function (e) {
     var s = slotById(sel);
     if (!s) return;
     var btn = e.target.closest("button");

@@ -14,6 +14,6 @@ The stage is a **plot**: named dashed boxes for where popups live. It is not the
 - Drag slots on the letterboxed canvas. Snap and grid (thirds, center, safe) are composer-only; OBS does not draw them.
 - Playback: once or loop (video/audio). Optional max `duration_ms` on the fireable slot. Blank or 0 is sticky until **Hide** / **Hide all**. New slots default to 5000 ms so Test does not stick forever. A green mark shows a slot that is on screen.
 - Eye toggles `enabled`. Off hides that box on the stage (group eye hides every member) and 404s fire. A disabled member is also skipped when the group fires. The row stays in the list, dimmed.
-- **Test** hits the same trigger URL as production. **Hide** next to it. Copy that URL into Streamer.bot.
+- **Test** hits the same trigger URL as production. **Hide** next to it. Copy that URL into Streamer.bot. Save, Test, Hide, Copy trigger URL, and Trash stay pinned at the bottom of the inspector while the fields scroll.
 - Save of position happens on pointer up, not while dragging. Inspector x/y/w/h/z update the box while typing; `text_template` and theme update the stage; `label` updates the layer list. PUT on change/blur.
 - Scene switch and Hide all are on the top bar. OBS host/password/Browser Source live in Settings, not the slot inspector.
