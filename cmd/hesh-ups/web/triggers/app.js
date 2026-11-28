@@ -107,6 +107,17 @@
     btn.setAttribute("aria-pressed", live ? "true" : "false");
   }
 
+  function anyLive(rows) {
+    return rows.some(function (s) { return !!s.visible; });
+  }
+
+  function setAllBtn(live) {
+    var btn = document.getElementById("btn-hide-all");
+    btn.innerHTML = live ? icon("eye-off") + " Hide all" : icon("eye") + " Show all";
+    btn.setAttribute("aria-pressed", live ? "true" : "false");
+    btn.dataset.mode = live ? "hide" : "show";
+  }
+
   function paintLive(rows) {
     rows.forEach(function (s) {
       var row = list.querySelector('[data-id="' + s.id + '"]');
@@ -116,6 +127,7 @@
       if (live) live.setAttribute("title", s.visible ? "live" : "idle");
       setToggle(row, !!s.visible);
     });
+    setAllBtn(anyLive(rows));
   }
 
   function render(rows) {
@@ -141,6 +153,7 @@
       if (!on) row.title = "Disabled — fire is 404 until the composer eye is on";
       list.appendChild(row);
     });
+    setAllBtn(anyLive(rows));
   }
 
   function load() {
@@ -195,6 +208,20 @@
   });
 
   document.getElementById("btn-hide-all").addEventListener("click", function () {
+    var btn = document.getElementById("btn-hide-all");
+    if (btn.dataset.mode === "show") {
+      var ids = [];
+      list.querySelectorAll(".row:not(.off)").forEach(function (row) {
+        ids.push(row.dataset.id);
+      });
+      Promise.all(ids.map(function (id) {
+        return fetch(popupURL(id, "user=Ada"), { method: "POST" });
+      })).then(function () {
+        setStatus(ids.length ? "Fired all" : "Nothing to show");
+        return load();
+      }).catch(function () { setStatus("Show all failed"); });
+      return;
+    }
     fetch(origin() + "/api/popup/hide_all" + tokenQuery(), { method: "POST" }).then(function (r) {
       if (!r.ok) return errMsg(r).then(setStatus);
       setStatus("Hidden all");
