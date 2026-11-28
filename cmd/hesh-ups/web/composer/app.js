@@ -216,13 +216,69 @@
     return putSlot(slot).then(load);
   }
 
-  // File length in ms, rounded up. Null when the element has no finite duration.
-  function mediaDurationMs(kind, path) {
-    return new Promise(function (resolve) {
-      if ((kind !== "video" && kind !== "audio") || !path) {
-        resolve(null);
-        return;
+  function fileDurationKind(kind) {
+    return kind === "video" || kind === "audio" || kind === "gif";
+  }
+
+  function skipGifBlocks(b, i) {
+    while (i < b.length) {
+      var n = b[i++];
+      if (!n) return i;
+      i += n;
+      if (i > b.length) return -1;
+    }
+    return -1;
+  }
+
+  // One cycle in ms. A frame delay of 0 or 1 (hundredths of a second) counts as 10, matching the browsers that play the overlay.
+  function gifLengthMs(buf) {
+    var b = new Uint8Array(buf);
+    if (b.length < 13 || b[0] !== 0x47 || b[1] !== 0x49 || b[2] !== 0x46) return null;
+    var i = 13;
+    if (b[10] & 0x80) i += 3 * (1 << ((b[10] & 7) + 1));
+    var total = 0;
+    var frames = 0;
+    while (i < b.length) {
+      var c = b[i++];
+      if (c === 0x3B) break;
+      if (c === 0x21) {
+        if (i >= b.length) return null;
+        var label = b[i++];
+        if (label === 0xF9 && i + 3 < b.length && b[i] >= 4) {
+          var delay = b[i + 2] | (b[i + 3] << 8);
+          if (delay < 2) delay = 10;
+          total += delay * 10;
+          frames++;
+        }
+        i = skipGifBlocks(b, i);
+        if (i < 0) return null;
+        continue;
       }
+      if (c === 0x2C) {
+        if (i + 9 > b.length) return null;
+        i += 8;
+        if (b[i++] & 0x80) i += 3 * (1 << ((b[i - 1] & 7) + 1));
+        if (i >= b.length) return null;
+        i++;
+        i = skipGifBlocks(b, i);
+        if (i < 0) return null;
+        continue;
+      }
+      return null;
+    }
+    return frames ? total : null;
+  }
+
+  // File length in ms. Video and audio round up. Null when there is no finite duration.
+  function mediaDurationMs(kind, path) {
+    if (!path || !fileDurationKind(kind)) return Promise.resolve(null);
+    if (kind === "gif") {
+      return fetch("/media/" + path).then(function (r) {
+        if (!r.ok) throw new Error("media");
+        return r.arrayBuffer();
+      }).then(gifLengthMs).catch(function () { return null; });
+    }
+    return new Promise(function (resolve) {
       var el = document.createElement(kind === "video" ? "video" : "audio");
       el.preload = "metadata";
       function done(ms) {
@@ -243,7 +299,7 @@
   function assignMedia(s, path, kind) {
     s.media_path = path;
     s.media_kind = kind;
-    if (s.parent_id || (kind !== "video" && kind !== "audio")) return saveSlot(s);
+    if (s.parent_id || !fileDurationKind(kind)) return saveSlot(s);
     return mediaDurationMs(kind, path).then(function (ms) {
       if (ms != null) s.duration_ms = ms;
       return saveSlot(s);
@@ -251,7 +307,7 @@
   }
 
   function resetDuration(s) {
-    var timed = !s.parent_id && (s.media_kind === "video" || s.media_kind === "audio") && s.media_path;
+    var timed = !s.parent_id && fileDurationKind(s.media_kind) && s.media_path;
     function apply(ms) {
       s.duration_ms = ms;
       var el = document.getElementById("f-dur");
