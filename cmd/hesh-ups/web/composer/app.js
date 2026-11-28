@@ -16,6 +16,7 @@
   var btnFile = document.getElementById("btn-file");
   var token = "";
   var statusTimer = null;
+  var DEFAULT_DURATION_MS = 5000;
 
   function icon(name) {
     return '<svg class="icon" aria-hidden="true"><use href="icons.svg#tabler-' + name + '"></use></svg>';
@@ -213,6 +214,58 @@
 
   function saveSlot(slot) {
     return putSlot(slot).then(load);
+  }
+
+  // File length in ms, rounded up. Null when the element has no finite duration.
+  function mediaDurationMs(kind, path) {
+    return new Promise(function (resolve) {
+      if ((kind !== "video" && kind !== "audio") || !path) {
+        resolve(null);
+        return;
+      }
+      var el = document.createElement(kind === "video" ? "video" : "audio");
+      el.preload = "metadata";
+      function done(ms) {
+        el.removeAttribute("src");
+        el.onloadedmetadata = null;
+        el.onerror = null;
+        resolve(ms);
+      }
+      el.onloadedmetadata = function () {
+        var ms = Math.ceil(el.duration * 1000);
+        done(isFinite(ms) && ms > 0 ? ms : null);
+      };
+      el.onerror = function () { done(null); };
+      el.src = "/media/" + path;
+    });
+  }
+
+  function assignMedia(s, path, kind) {
+    s.media_path = path;
+    s.media_kind = kind;
+    if (s.parent_id || (kind !== "video" && kind !== "audio")) return saveSlot(s);
+    return mediaDurationMs(kind, path).then(function (ms) {
+      if (ms != null) s.duration_ms = ms;
+      return saveSlot(s);
+    });
+  }
+
+  function resetDuration(s) {
+    var timed = !s.parent_id && (s.media_kind === "video" || s.media_kind === "audio") && s.media_path;
+    function apply(ms) {
+      s.duration_ms = ms;
+      var el = document.getElementById("f-dur");
+      if (el) el.value = String(ms);
+      return saveSlot(s);
+    }
+    if (!timed) return apply(DEFAULT_DURATION_MS);
+    return mediaDurationMs(s.media_kind, s.media_path).then(function (ms) {
+      if (ms == null) {
+        setStatus("Could not read duration");
+        return;
+      }
+      return apply(ms);
+    });
   }
 
   function persist(old, body) {
@@ -618,7 +671,7 @@
       html += '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>';
     }
     if (!child) {
-      html += '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>';
+      html += '<label>duration_ms <span class="dur-row"><input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"><button type="button" id="f-reset">Reset</button></span></label>';
       html += '<p class="muted">Blank duration stays on until Stop. Default for new slots is 5000.</p>';
     }
     if (kind === "group") {
@@ -876,6 +929,10 @@
         return load();
       });
     }
+    if (id === "f-reset") {
+      resetDuration(s);
+      return;
+    }
     if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
     }
@@ -902,20 +959,17 @@
       fd.append("file", e.target.files[0]);
       fetch("/api/media", { method: "POST", body: fd }).then(function (r) { return r.json(); }).then(function (m) {
         var s = slotById(sel);
-        if (!s) return;
-        s.media_path = m.path;
-        s.media_kind = m.kind;
-        return saveSlot(s);
+        if (!s || !m.path) return;
+        return assignMedia(s, m.path, m.kind);
       });
       return;
     }
     if (e.target.id === "f-media" && e.target.value) {
       var s = slotById(sel);
       if (!s) return;
-      s.media_path = e.target.value;
       var opt = e.target.selectedOptions && e.target.selectedOptions[0];
-      if (opt && opt.dataset.kind) s.media_kind = opt.dataset.kind;
-      saveSlot(s);
+      var kind = (opt && opt.dataset.kind) || s.media_kind;
+      assignMedia(s, e.target.value, kind);
       return;
     }
     if (e.target.id === "f-id") return;
@@ -958,7 +1012,7 @@
       body: JSON.stringify({
         id: id, label: "New slot", x: 80, y: 80, w: 320, h: 180, z: n,
         media_kind: "text", media_path: "", text_template: "New slot", playback: "once",
-        duration_ms: 5000, volume: 100, enabled: true, parent_id: "", theme: "plain",
+        duration_ms: DEFAULT_DURATION_MS, volume: 100, enabled: true, parent_id: "", theme: "plain",
       }),
     }).then(function () { sel = id; return load(); });
   });
