@@ -78,24 +78,31 @@ body.admin input[type="checkbox"] { width: auto; }
 #file-menu .file-sep button:last-child { margin-bottom: 0; }
 #file-version { color: var(--muted); font-size: 11px; }
 #sidebar { width: 240px; border-right: 1px solid var(--line); }
-#inspector-pane { width: 280px; border-left: 1px solid var(--line); }
+#inspector-pane {
+  width: 280px; flex: none; min-width: 0; min-height: 0; overflow: hidden;
+  border-left: 1px solid var(--line);
+}
 .layers-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; }
 .win-title {
   color: var(--accent); font-weight: 700; font-size: 11px;
   letter-spacing: 0.08em; text-transform: uppercase;
   display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px 0;
 }
-#inspector-pane .win-title { flex: none; }
+#inspector-pane .win-title {
+  flex: none; padding-bottom: 8px; border-bottom: 1px solid var(--line);
+}
+#inspector { min-height: 0; }
 #inspector-actions {
   flex: none;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 6px;
   padding: 8px 10px;
   border-top: 1px solid var(--line);
   background: var(--panel);
 }
-#inspector-actions button { margin: 0; }
+#inspector-actions .row { display: flex; flex-wrap: wrap; gap: 6px; }
+#inspector-actions button { margin: 0; flex: 1 1 auto; min-width: 0; }
 #inspector .geom {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -137,8 +144,9 @@ body.admin input[type="checkbox"] { width: auto; }
 #inspector button.where.member { color: var(--accent2); border-color: var(--accent2); background: rgba(136, 242, 93, 0.08); }
 #f-members { margin: 4px 0 0; padding: 0 0 0 1.1em; font-size: 12px; color: var(--text); }
 #layer-list button { width: auto; padding: 4px; }
-.win-body { flex: 1; overflow: auto; padding: 8px 10px 16px; }
+.win-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px 16px; }
 #inspector label { display: block; font-size: 12px; color: var(--muted); margin-top: 8px; }
+#inspector textarea { min-height: 3em; max-height: 8em; resize: vertical; }
 #inspector button { display: inline-flex; align-items: center; gap: 6px; margin: 4px 4px 0 0; padding: 6px 10px; }
 .muted { color: var(--muted); }
 #stage-wrap { flex: 1; min-width: 0; background: #1a1a1a; display: flex; align-items: center; justify-content: center; position: relative; }

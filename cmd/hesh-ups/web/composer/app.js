@@ -543,7 +543,10 @@
     ordered.forEach(function (s) { list.appendChild(layerRow(s)); });
     boxes.innerHTML = "";
     ordered.forEach(function (s) { addBox(s, boxes); });
-    paintInspector();
+    var ae = document.activeElement;
+    var typing = ae && inspector.contains(ae) && ae.id !== "f-kind" && ae.id !== "f-file" &&
+      (ae.tagName === "TEXTAREA" || (ae.tagName === "INPUT" && ae.type !== "file"));
+    if (!(typing && inspector.dataset.slot === (sel || ""))) paintInspector();
   }
 
   function paintInspector() {
@@ -551,6 +554,7 @@
     if (!s) {
       document.getElementById("inspector-pane").classList.remove("in-group", "member");
       inspector.innerHTML = '<p class="muted">Select a slot</p>';
+      inspector.dataset.slot = "";
       inspectorActions.hidden = true;
       inspectorActions.innerHTML = "";
       return;
@@ -611,11 +615,14 @@
       html += '<p><button type="button" id="f-add-member">' + icon("plus") + " Add member</button></p>";
     }
     inspector.innerHTML = html;
-    var actions = '<button type="button" id="f-save">' + icon("device-floppy") + " Save</button>" +
+    inspector.dataset.slot = s.id;
+    var actions = '<div class="row">' +
+      '<button type="button" id="f-save">' + icon("device-floppy") + " Save</button>" +
       '<button type="button" id="f-test">' + icon("player-play") + " Test</button>" +
-      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button>";
-    if (!child) actions += '<button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button>";
-    actions += '<button type="button" id="f-del">' + icon("trash") + " Trash</button>";
+      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button></div>" +
+      '<div class="row">';
+    if (!child) actions += '<button type="button" id="f-copy" title="Copy trigger URL">' + icon("link") + " Copy URL</button>";
+    actions += '<button type="button" id="f-del">' + icon("trash") + " Trash</button></div>";
     inspectorActions.innerHTML = actions;
     inspectorActions.hidden = false;
     document.getElementById("f-kind").value = kind;
@@ -812,6 +819,15 @@
     if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
     }
+  });
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || String(e.key).toLowerCase() !== "s") return;
+    if (!settingsOverlay.hidden) return;
+    var s = slotById(sel);
+    if (!s) return;
+    e.preventDefault();
+    var body = readForm(s);
+    if (body) persist(s, body).catch(function () {});
   });
   inspector.addEventListener("input", function (e) {
     var id = e.target.id;
