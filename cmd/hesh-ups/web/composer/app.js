@@ -181,6 +181,9 @@
       downBanner.hidden = true;
       return r.json();
     }).then(function (s) {
+      (s.slots || []).forEach(function (sl) {
+        sl.enabled = sl.enabled !== false && sl.enabled !== 0 && sl.enabled !== "0";
+      });
       state = s;
       render();
     }).catch(function () {
@@ -294,13 +297,21 @@
     return best;
   }
 
+  function isOn(s) {
+    return !!s && s.enabled !== false && s.enabled !== 0 && s.enabled !== "0";
+  }
+
   function stageShown(s) {
-    if (!s || !s.enabled) return false;
-    if (s.parent_id) {
-      var p = slotById(s.parent_id);
-      if (!p || !p.enabled) return false;
-    }
+    if (!isOn(s)) return false;
+    if (s.parent_id) return isOn(slotById(s.parent_id));
     return true;
+  }
+
+  function toggleEye(s) {
+    if (!s) return;
+    s.enabled = !isOn(s);
+    render();
+    saveSlot(s).catch(function () { load(); });
   }
 
   function membersOf(id) {
@@ -436,17 +447,23 @@
       if (s.media_kind === "group") cls.push("group");
       if (s.parent_id) cls.push("child");
       if (sel && slotById(sel) && slotById(sel).parent_id === s.id) cls.push("host");
-      if (!s.enabled) cls.push("off");
+      if (!isOn(s) || (s.parent_id && !isOn(slotById(s.parent_id)))) cls.push("off");
       li.dataset.id = s.id;
       var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
       if (live) cls.push("live");
       li.className = cls.join(" ");
       var row = document.createElement("div");
       row.className = "row";
-      row.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="' + (s.enabled ? "hide" : "show") + '">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
+      var on = isOn(s);
+      row.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="' + (on ? "hide" : "show") + '">' + icon(on ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
       row.querySelector("span").textContent = s.label || s.id;
       row.addEventListener("click", function (e) {
-        if (e.target.closest("[data-eye]")) return;
+        if (e.target.closest("[data-eye]")) {
+          e.preventDefault();
+          e.stopPropagation();
+          toggleEye(s);
+          return;
+        }
         sel = s.id;
         render();
       });
@@ -787,11 +804,9 @@
 
   list.addEventListener("click", function (e) {
     var eye = e.target.closest("[data-eye]");
-    var id = eye && eye.getAttribute("data-eye");
-    if (!id) return;
-    var s = slotById(id);
-    s.enabled = !s.enabled;
-    saveSlot(s);
+    if (!eye) return;
+    e.preventDefault();
+    e.stopPropagation();
   });
 
   document.getElementById("add-slot").addEventListener("click", function () {
