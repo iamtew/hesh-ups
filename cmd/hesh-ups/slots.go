@@ -2,9 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"html"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -25,6 +29,7 @@ type showMember struct {
 	Volume    int    `json:"volume"`
 	Text      string `json:"text"`
 	Theme     string `json:"theme"`
+	Look      Look   `json:"look"`
 	X         int    `json:"x"`
 	Y         int    `json:"y"`
 	W         int    `json:"w"`
@@ -40,6 +45,7 @@ type liveSlot struct {
 	Playback  string
 	Volume    int
 	Theme     string
+	Look      Look
 	Duration  *int
 	Members   []showMember
 	WaitEnded bool
@@ -63,8 +69,16 @@ type Slot struct {
 	CSSClass     string `json:"css_class,omitempty"`
 	ParentID     string `json:"parent_id"`
 	Theme        string `json:"theme"`
+	Look         Look   `json:"look"`
 	Visible      bool   `json:"visible,omitempty"`
 	Text         string `json:"text,omitempty"`
+}
+
+type fireOpts struct {
+	Vars   map[string]string
+	Dur    *int
+	Media  string
+	Volume *int
 }
 
 type Event struct {
@@ -76,10 +90,37 @@ type Event struct {
 	Result string `json:"result"`
 }
 
-func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text string, code int, errKey, errMsg string) {
+func (s *Server) fire(id string, vars map[string]string, opt fireOpts) (text string, code int, errKey, errMsg string) {
 	sl, ok := s.getSlot(id)
 	if !ok || !sl.Enabled || sl.ParentID != "" {
 		return "", 404, "unknown_slot", "unknown slot"
+	}
+	path := sl.MediaPath
+	if opt.Media != "" {
+		switch sl.MediaKind {
+		case "image", "gif", "video", "audio":
+			if !safeName.MatchString(opt.Media) || strings.Contains(opt.Media, "..") {
+				return "", 400, "bad_media", "bad media"
+			}
+			kind, ok := mediaKindFromExt(opt.Media)
+			if !ok || kind != sl.MediaKind {
+				return "", 400, "bad_media", "bad media"
+			}
+			if _, err := os.Stat(filepath.Join(s.mediaDir, opt.Media)); err != nil {
+				return "", 400, "bad_media", "bad media"
+			}
+			path = opt.Media
+		}
+	}
+	vol := sl.Volume
+	if opt.Volume != nil {
+		vol = *opt.Volume
+		if vol < 0 {
+			vol = 0
+		}
+		if vol > 100 {
+			vol = 100
+		}
 	}
 	var members []showMember
 	if sl.MediaKind == "group" {
@@ -99,11 +140,11 @@ func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text
 	s.seq[id]++
 	seq := s.seq[id]
 	eff := sl.DurationMS
-	if durOverride != nil {
-		if *durOverride <= 0 {
+	if opt.Dur != nil {
+		if *opt.Dur <= 0 {
 			eff = nil
 		} else {
-			eff = durOverride
+			eff = opt.Dur
 		}
 	}
 	if eff != nil && *eff <= 0 {
@@ -112,8 +153,8 @@ func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text
 	wait := waitEnded(sl, members, eff)
 	sticky := eff == nil && !wait
 	lv := liveSlot{
-		Seq: seq, Text: text, MediaKind: sl.MediaKind, MediaPath: sl.MediaPath,
-		Playback: sl.Playback, Volume: sl.Volume, Theme: sl.Theme, Duration: eff,
+		Seq: seq, Text: text, MediaKind: sl.MediaKind, MediaPath: path,
+		Playback: sl.Playback, Volume: vol, Theme: sl.Theme, Look: sl.Look.norm(), Duration: eff,
 		Members: members, WaitEnded: wait,
 	}
 	s.live[id] = lv
@@ -129,7 +170,7 @@ func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text
 	if sticky {
 		_, _ = s.db.Exec(`INSERT INTO visible(slot_id,seq,text,media_kind,media_path) VALUES(?,?,?,?,?)
 			ON CONFLICT(slot_id) DO UPDATE SET seq=excluded.seq,text=excluded.text,media_kind=excluded.media_kind,media_path=excluded.media_path`,
-			id, seq, visText, sl.MediaKind, sl.MediaPath)
+			id, seq, visText, sl.MediaKind, path)
 	} else {
 		_, _ = s.db.Exec(`DELETE FROM visible WHERE slot_id=?`, id)
 		if eff != nil {
@@ -152,18 +193,18 @@ func memberPayload(c Slot, vars map[string]string) showMember {
 		th = "plain"
 	}
 	return showMember{
-		ID: c.ID, MediaKind: c.MediaKind, MediaURL: mediaURL(c),
+		ID: c.ID, MediaKind: c.MediaKind, MediaURL: mediaURLKind(c.MediaKind, c.MediaPath),
 		Playback: c.Playback, Volume: c.Volume, Text: renderTemplate(c.TextTemplate, vars),
-		Theme: th, X: c.X, Y: c.Y, W: c.W, H: c.H, Z: c.Z,
+		Theme: th, Look: c.Look.norm(), X: c.X, Y: c.Y, W: c.W, H: c.H, Z: c.Z,
 	}
 }
 
 func showMap(id string, sl Slot, lv liveSlot) map[string]any {
 	m := map[string]any{
 		"type": "show", "slot": id, "seq": lv.Seq,
-		"media_kind": sl.MediaKind, "media_url": mediaURL(sl),
-		"playback": sl.Playback, "volume": sl.Volume, "text": lv.Text,
-		"theme": sl.Theme, "duration_ms": jsonDur(lv.Duration),
+		"media_kind": sl.MediaKind, "media_url": mediaURLKind(sl.MediaKind, lv.MediaPath),
+		"playback": sl.Playback, "volume": lv.Volume, "text": lv.Text,
+		"theme": sl.Theme, "look": lv.Look, "duration_ms": jsonDur(lv.Duration),
 	}
 	if sl.MediaKind == "group" {
 		m["members"] = lv.Members
@@ -239,10 +280,14 @@ func (s *Server) ended(slot string, seq int) {
 }
 
 func mediaURL(sl Slot) string {
-	if sl.MediaKind == "text" || sl.MediaKind == "group" || sl.MediaPath == "" {
+	return mediaURLKind(sl.MediaKind, sl.MediaPath)
+}
+
+func mediaURLKind(kind, path string) string {
+	if kind == "text" || kind == "group" || path == "" {
 		return ""
 	}
-	return "/media/" + sl.MediaPath
+	return "/media/" + path
 }
 
 func jsonDur(d *int) any {
@@ -284,6 +329,12 @@ func validSlot(sl Slot) (errKey, msg string) {
 	if !themes[sl.Theme] {
 		return "invalid_slot", "invalid theme"
 	}
+	if sl.Look.empty() {
+		sl.Look = defaultLook()
+	}
+	if key, msg := validLook(sl.Look); key != "" {
+		return key, msg
+	}
 	if sl.MediaKind == "group" && sl.ParentID != "" {
 		return "invalid_slot", "nested group"
 	}
@@ -306,4 +357,58 @@ func atoiPtr(s string) *int {
 		return nil
 	}
 	return &n
+}
+
+func (s *Server) duplicateSlot(id string) (Slot, int, string, string) {
+	sl, ok := s.getSlot(id)
+	if !ok || sl.ParentID != "" {
+		return Slot{}, 404, "unknown_slot", "unknown slot"
+	}
+	nid := s.uniqueSlotID(sl.ID)
+	cp := sl
+	cp.ID = nid
+	if cp.Label != "" {
+		cp.Label = cp.Label + " copy"
+	}
+	cw, _ := strconv.Atoi(s.setting("canvas_w"))
+	ch, _ := strconv.Atoi(s.setting("canvas_h"))
+	if cw <= 0 {
+		cw = 1920
+	}
+	if ch <= 0 {
+		ch = 1080
+	}
+	cp.X += 24
+	cp.Y += 24
+	if cp.X+cp.W > cw {
+		cp.X = max(0, cw-cp.W)
+	}
+	if cp.Y+cp.H > ch {
+		cp.Y = max(0, ch-cp.H)
+	}
+	if err := s.upsertSlot(cp); err != nil {
+		return Slot{}, 500, "error", err.Error()
+	}
+	if sl.MediaKind == "group" {
+		for i, c := range s.childSlots(id) {
+			cc := c
+			cc.ParentID = nid
+			cc.ID = s.uniqueSlotID(fmt.Sprintf("%s-%d", nid, i+1))
+			_ = s.upsertSlot(cc)
+		}
+	}
+	s.broadcastConfig()
+	return cp, 200, "", ""
+}
+
+func (s *Server) uniqueSlotID(base string) string {
+	n := 2
+	id := base + "-2"
+	for {
+		if _, ok := s.getSlot(id); !ok {
+			return id
+		}
+		n++
+		id = fmt.Sprintf("%s-%d", base, n)
+	}
 }

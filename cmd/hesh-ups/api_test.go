@@ -883,8 +883,11 @@ func TestSchemaV1Migrate(t *testing.T) {
 	if !ok || sl.MediaKind != "text" || sl.Theme != "plain" {
 		t.Fatalf("%v %v", ok, sl)
 	}
-	if s.setting("schema_version") != "2" {
+	if s.setting("schema_version") != "3" {
 		t.Fatal(s.setting("schema_version"))
+	}
+	if sl.Look.Fit != "shrink" || sl.Look.Motion != "fade" {
+		t.Fatalf("look %#v", sl.Look)
 	}
 }
 
@@ -893,5 +896,115 @@ func TestObsKickOnSettings(t *testing.T) {
 	res, b := doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"obs_password": "x"})
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
+	}
+}
+
+func TestLookRoundtrip(t *testing.T) {
+	_, ts := testSrv(t)
+	res, b := doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+		"id": "follow", "label": "Follow", "x": 10, "y": 10, "w": 400, "h": 80, "z": 1,
+		"media_kind": "text", "text_template": "Thanks {user}!", "playback": "once",
+		"volume": 100, "enabled": true,
+		"look": map[string]any{"font_size": 40, "font_weight": 700, "fill": "#ff0", "stroke": "#000", "stroke_w": 0, "align": "left", "fit": "ellipsis", "motion": "slide"},
+	})
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+	var st struct {
+		Slots []Slot `json:"slots"`
+	}
+	getJSON(t, ts, "/api/state", &st)
+	if len(st.Slots) != 1 || st.Slots[0].Look.FontSize != 40 || st.Slots[0].Look.StrokeW != 0 || st.Slots[0].Look.Motion != "slide" {
+		t.Fatalf("%+v", st.Slots)
+	}
+	c := wsDial(t, ts)
+	readType(t, c, "config", 2*time.Second)
+	readType(t, c, "snapshot", 2*time.Second)
+	doJSON(t, "POST", ts.URL+"/api/popup/follow?user=Ada", nil)
+	show := readType(t, c, "show", 2*time.Second)
+	lk, _ := show["look"].(map[string]any)
+	if lk["align"] != "left" || lk["fit"] != "ellipsis" {
+		t.Fatal(show)
+	}
+	res, b = doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+		"id": "follow", "label": "Follow", "x": 10, "y": 10, "w": 400, "h": 80, "z": 1,
+		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
+		"look": map[string]any{"motion": "zoom"},
+	})
+	if res.StatusCode != 400 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+}
+
+func TestDuplicateGroup(t *testing.T) {
+	_, ts := testSrv(t)
+	doJSON(t, "PUT", ts.URL+"/api/slots/raid", map[string]any{
+		"id": "raid", "label": "Raid", "x": 0, "y": 0, "w": 200, "h": 100, "z": 1,
+		"media_kind": "group", "playback": "once", "volume": 100, "enabled": true,
+	})
+	doJSON(t, "PUT", ts.URL+"/api/slots/raid-t", map[string]any{
+		"id": "raid-t", "label": "t", "x": 0, "y": 0, "w": 80, "h": 40, "z": 1,
+		"media_kind": "text", "text_template": "Hi", "playback": "once", "volume": 100,
+		"enabled": true, "parent_id": "raid",
+	})
+	res, b := doJSON(t, "POST", ts.URL+"/api/slots/raid/duplicate", nil)
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+	var cp Slot
+	if json.Unmarshal(b, &cp) != nil || cp.ID != "raid-2" {
+		t.Fatal(string(b))
+	}
+	var st struct {
+		Slots []Slot `json:"slots"`
+	}
+	getJSON(t, ts, "/api/state", &st)
+	kids := 0
+	for _, sl := range st.Slots {
+		if sl.ParentID == "raid-2" {
+			kids++
+		}
+	}
+	if kids != 1 {
+		t.Fatalf("kids %d %+v", kids, st.Slots)
+	}
+	res, _ = doJSON(t, "POST", ts.URL+"/api/slots/raid-t/duplicate", nil)
+	if res.StatusCode != 404 {
+		t.Fatal(res.StatusCode)
+	}
+}
+
+func TestFireMediaVolume(t *testing.T) {
+	s, ts := testSrv(t)
+	putLogo(t, s, ts)
+	if err := os.WriteFile(filepath.Join(s.mediaDir, "alt.png"), png1x1, 0644); err != nil {
+		t.Fatal(err)
+	}
+	c := wsDial(t, ts)
+	readType(t, c, "config", 2*time.Second)
+	readType(t, c, "snapshot", 2*time.Second)
+	res, b := doJSON(t, "POST", ts.URL+"/api/popup/logo?media=alt.png&volume=40", nil)
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+	show := readType(t, c, "show", 2*time.Second)
+	if show["media_url"] != "/media/alt.png" {
+		t.Fatal(show)
+	}
+	if vol, _ := show["volume"].(float64); vol != 40 {
+		t.Fatal(show)
+	}
+	res, _ = doJSON(t, "POST", ts.URL+"/api/popup/logo?media=nope.png", nil)
+	if res.StatusCode != 400 {
+		t.Fatal(res.StatusCode)
+	}
+}
+
+func TestSceneHasSource(t *testing.T) {
+	if sceneHasSource([]string{"cam", "hesh-ups"}, "hesh-ups") == false {
+		t.Fatal("miss")
+	}
+	if sceneHasSource([]string{"cam"}, "hesh-ups") {
+		t.Fatal("false positive")
 	}
 }

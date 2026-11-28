@@ -72,7 +72,7 @@ Tray **Open window** uses WebView. **Open in browser** uses the system browser o
 | Overlay URL | `http://127.0.0.1:{port}/overlay/` |
 | OBS ws | `127.0.0.1:4455`, password from settings |
 | Browser source name | `hesh-ups` |
-| Animations | CSS fade in/out only |
+| Animations | CSS fade, slide, or scale (~200ms) |
 | Driver | `database/sql` + `modernc.org/sqlite` (no gcc) |
 | SQLite | WAL on; schema version in `settings` |
 
@@ -122,7 +122,7 @@ Visible slot state is process memory **and** a small `visible` table so **sticky
 
 ### Schema version
 
-`settings` key `schema_version` = `2`. Empty file: create tables and write defaults. On open: if version lower, migrate; if higher, refuse to start. Schema 2 adds `parent_id` and `theme`, and rewrites `media_kind=none` → `text`.
+`settings` key `schema_version` = `3`. Empty file: create tables and write defaults. On open: if version lower, migrate; if higher, refuse to start. Schema 2 adds `parent_id` and `theme`, and rewrites `media_kind=none` → `text`. Schema 3 adds `look` (JSON type/motion knobs).
 
 ### `settings` (kv)
 
@@ -171,11 +171,26 @@ CREATE TABLE slots (
   enabled       INTEGER NOT NULL DEFAULT 1, -- 0 = layer eye off; fire is 404
   css_class     TEXT,             -- leftover column; API ignores it
   parent_id     TEXT NOT NULL DEFAULT '', -- child of a group; empty = top-level
-  theme         TEXT NOT NULL DEFAULT 'plain' -- text kind: plain | lcd-glass | sesh-glass | sesh-glass-old | 3026-d3c0
+  theme         TEXT NOT NULL DEFAULT 'plain', -- text kind: plain | lcd-glass | sesh-glass | sesh-glass-old | 3026-d3c0
+  look          TEXT NOT NULL DEFAULT '' -- JSON Look; empty = defaults
 );
 ```
 
 `id` is the trigger name. Must match `[a-z0-9-]+`. Reserved: `hide_all` (the hide-all route). Several top-level slots may show at once. They may overlap; higher `z` is on top.
+
+`look` is JSON on the slot (API field `look`). Empty or omitted → defaults. Overlay and composer apply it as inline styles.
+
+| key | values | default |
+| --- | --- | --- |
+| `font_size` | 8–400 px | `24` |
+| `font_weight` | `400` / `600` / `700` | `600` |
+| `fill` / `stroke` | `#rgb` or `#rrggbb` | `#ffffff` / `#111111` |
+| `stroke_w` | 0–20 | `3` (`0` = no stroke) |
+| `align` | `left` / `center` / `right` | `center` |
+| `fit` | `shrink` / `wrap` / `ellipsis` | `shrink` (shrink the type until the string fits the box) |
+| `motion` | `fade` / `slide` / `scale` | `fade` (top-level slot; group box, not children) |
+
+Text knobs apply to `text` slots (including group members). `motion` is the fireable slot’s entrance/exit.
 
 Kinds are **exclusive**. `text` needs a non-empty `text_template`. `image`/`gif`/`video`/`audio` need a non-empty `media_path`. `group` is a container: children have `parent_id` set to the group id; child `x,y` are relative to the group box. Nested groups are rejected. Empty group may be saved; **fire** of an empty group → `400` `empty_slot`. Child fire URL → `404` `unknown_slot`. Composer copies picked files into `media/` and stores a path relative to that folder. `GET /media/...` only serves files under `media/` (reject `..` and absolute paths).
 
@@ -315,8 +330,10 @@ GET and POST are both accepted on fire/hide/hide_all/scene so Streamer.bot “op
 Fire query (all optional):
 
 - `duration_ms` — override slot duration for this show (`0` = no wall-clock cap this time).
+- `media` — basename under `media/` for this show (image/gif/video/audio only; must exist and match the slot kind).
+- `volume` — 0–100 for this show (clamped).
 - `token` — if settings token is set.
-- any other key — template vars (`user`, `amount`, `message`, …). Reserved: `duration_ms`, `token`.
+- any other key — template vars (`user`, `amount`, `message`, …). Reserved: `duration_ms`, `token`, `media`, `volume`.
 
 POST JSON optional. Merge order (later wins): query string → JSON object keys → JSON `vars` object if present. Ignore reserved keys `duration_ms`, `token`, `vars` as template vars.
 
@@ -328,7 +345,9 @@ Example: `GET /api/popup/follow?user=Ada&amount=1` with template `Thanks {user}!
 
 `GET /api/slots` — all slots (no visible flag required; `/api/state` is the live view).
 
-`PUT /api/slots/{id}` — upsert one slot (JSON body = columns; if body has `id` it must match the URL). Invalid slug, reserved id, `media_kind`, `playback`, `theme`, bad `parent_id`, or empty payload for that kind → `400`.
+`PUT /api/slots/{id}` — upsert one slot (JSON body = columns; if body has `id` it must match the URL). Invalid slug, reserved id, `media_kind`, `playback`, `theme`, `look`, bad `parent_id`, or empty payload for that kind → `400`.
+
+`POST /api/slots/{id}/duplicate` — copy a **top-level** slot (offset 24px). Groups copy children with new ids. Member id → `404` `unknown_slot`. Response is the new slot.
 
 `DELETE /api/slots/{id}` — remove slot; if visible, hide first. Deleting a group also deletes its children.
 
@@ -373,8 +392,8 @@ Server → overlay:
 
 ```json
 {"type": "config", "canvas": {"w": 1920, "h": 1080}, "slots": [ /* slot rows without visible/text */ ]}
-{"type": "snapshot", "visible": [{"id": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "text": "Thanks Ada!", "theme": "plain", "duration_ms": 5000}]}
-{"type": "show", "slot": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "volume": 100, "text": "Thanks Ada!", "theme": "lcd-glass", "duration_ms": 5000}
+{"type": "snapshot", "visible": [{"id": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "text": "Thanks Ada!", "theme": "plain", "look": {"font_size": 24, "font_weight": 600, "fill": "#ffffff", "stroke": "#111111", "stroke_w": 3, "align": "center", "fit": "shrink", "motion": "fade"}, "duration_ms": 5000}]}
+{"type": "show", "slot": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "volume": 100, "text": "Thanks Ada!", "theme": "lcd-glass", "look": {"font_size": 24, "font_weight": 600, "fill": "#ffffff", "stroke": "#111111", "stroke_w": 3, "align": "center", "fit": "shrink", "motion": "fade"}, "duration_ms": 5000}
 {"type": "hide", "slot": "follow"}
 {"type": "clear"}
 ```
@@ -382,11 +401,11 @@ Server → overlay:
 `media_url` is `""` when `media_kind` is `text` or `group`. `text` is already rendered and HTML-escaped. `theme` is the text banner id (`plain` = stroke text, no Pixi). Group `show` includes `members` (relative `x,y,w,h`, per-child media/text/theme). `seq` is a per-slot integer. First fire is `1`; each new fire adds one. Restart of the process starts at `1` again. Group `ended` uses the group id and group `seq`.
 
 - `config` on connect and after slot or canvas save.
-- `snapshot` on connect: enough to redraw visible slots (seq, media, rendered text).
+- `snapshot` on connect: enough to redraw visible slots (seq, media, rendered text, look).
 - Live: `show` / `hide` / `clear` (hide_all).
 - Overlay hides on `hide` / `clear` only. It reports `ended`; the server decides and broadcasts `hide`.
 
-Overlay DOM: one node per **top-level** slot, class `slot popup`, positioned with `x,y,w,h`, `z-index`. Hidden = not shown. Background transparent. Body fills the canvas. Image/gif = `<img>`. Video = `<video autoplay>` with `loop` only if `playback=loop`, `volume` = slot `volume/100`. Audio = `<audio autoplay>` same `loop` and `volume`. Text = `.banner-content` (`.theme-panel` when theme ≠ `plain`) wrapping escaped `.banner-text`; `data-theme` on `.popup`; Pixi `start`/`stop` from embedded `SeshThemes`. Group = the group box with member `.popup` children at relative coords. Fade CSS ~200ms. Shared CSS/JS at `/shared/` (banner shell, themes, vendored Pixi). No disk skins.
+Overlay DOM: one node per **top-level** slot, class `slot popup`, positioned with `x,y,w,h`, `z-index`. Hidden = not shown. Background transparent. Body fills the canvas. Image/gif = `<img>`. Video = `<video autoplay>` with `loop` only if `playback=loop`, `volume` = slot `volume/100`. Audio = `<audio autoplay>` same `loop` and `volume`. Text = `.banner-content` (`.theme-panel` when theme ≠ `plain`) wrapping escaped `.banner-text`; `data-theme` on `.popup`; Pixi `start`/`stop` from embedded `SeshThemes`. Group = the group box with member `.popup` children at relative coords. Motion CSS ~200ms (`look.motion`: fade / slide / scale). Shared CSS/JS at `/shared/` (banner shell, look.js, themes, vendored Pixi). No disk skins.
 
 ---
 
@@ -414,7 +433,7 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 
 **Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **Plot**, not program: enabled slots are dashed named boxes. **Select** fills that slot (a group fills its members) with overlay content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). **Live** (`visible`, Test or HTTP) fills the same way plus the green live mark. Grid, cyan handles, layer names, group fill/tags (`GROUP` / `IN {group}`), and inspector group banner are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page (program only). Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** slot only — id, **label**, x y w h z (x/y and w/h share a two-column row; typing updates the box live; **`PUT` on change/blur** / pointerup). **type** first (`text` / `image` / `gif` / `video` / `audio` / `group`). Only knobs for that kind: text → template + theme; image/gif → file; video/audio → file + playback + volume; group → member list + Add member. Duration on the fireable slot (not on children). **Save** / **Test** / **Hide** / copy trigger URL / Trash sit in a strip pinned to the bottom of the pane while fields scroll (Ctrl+S / Cmd+S also Save). Test / Hide / copy URL use the group id for members. Text template field scrolls inside itself past a short max height. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
+**Inspector (right ~280px):** slot only — id, **label**, x y w h z (x/y and w/h share a two-column row; typing updates the box live; **`PUT` on change/blur** / pointerup). **type** first (`text` / `image` / `gif` / `video` / `audio` / `group`). Only knobs for that kind: text → template + theme; image/gif → file; video/audio → file + playback + volume; group → member list + Add member. Duration on the fireable slot (not on children). **Save** / **Test** / **Hide** / copy trigger URL / **Duplicate** (top-level) / Trash sit in a strip pinned to the bottom of the pane while fields scroll (Ctrl+S / Cmd+S also Save). Test / Hide / copy URL use the group id for members. Text slots also get size, weight, fill, stroke, align, and fit. Fireable slots get motion. Text template field scrolls inside itself past a short max height. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 
 If `/api/state` polling fails, a full-window down banner: application not running.
 
@@ -446,6 +465,8 @@ OBS is a JSON WebSocket at `ws://{obs_host}:{obs_port}` (default `127.0.0.1:4455
 | `GetInputList` | find `obs_browser_source` by `inputName` |
 | `CreateInput` | name missing |
 | `SetInputSettings` | name exists and `inputKind` is `browser_source` |
+| `GetSceneItemList` | each scene, before attaching |
+| `CreateSceneItem` | scene that does not already have the Browser Source |
 
 If the name exists as a **different** kind → HTTP `409` `{"error":"input exists, not browser_source"}`. Do not overwrite a mic.
 
@@ -505,7 +526,7 @@ Use this object for both Create and Set. `url` / `width` / `height` follow live 
 
 `overlay: true` merges; we still send the full dump.
 
-`POST /api/obs/browser-source` runs GetInputList then Create or Set. `503` if disconnected. Operator may still need to **add the source to other scenes**; Create only attaches to the current program scene.
+`POST /api/obs/browser-source` runs GetInputList then Create or Set, then **CreateSceneItem** on every scene in the collection that does not already have that source. `503` if disconnected. One input; no auto show/hide.
 
 `SetCurrentProgramScene` is a separate action (HTTP + composer top-bar picker). Not tied to popup fire.
 

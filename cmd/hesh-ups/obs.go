@@ -316,6 +316,7 @@ func (o *obsClient) ensureBrowserSource() error {
 		"fps_custom":             false,
 		"webpage_control_level":  1,
 	}
+	created := false
 	for _, in := range il.Inputs {
 		if in.InputName == name {
 			if in.InputKind != "browser_source" {
@@ -326,17 +327,65 @@ func (o *obsClient) ensureBrowserSource() error {
 				"overlay":       true,
 				"inputSettings": settings,
 			})
+			if err != nil {
+				return err
+			}
+			created = true
+			break
+		}
+	}
+	if !created {
+		_, err = o.request("CreateInput", map[string]any{
+			"sceneName":        sl.CurrentProgramSceneName,
+			"inputName":        name,
+			"inputKind":        "browser_source",
+			"sceneItemEnabled": true,
+			"inputSettings":    settings,
+		})
+		if err != nil {
 			return err
 		}
 	}
-	_, err = o.request("CreateInput", map[string]any{
-		"sceneName":        sl.CurrentProgramSceneName,
-		"inputName":        name,
-		"inputKind":        "browser_source",
-		"sceneItemEnabled": true,
-		"inputSettings":    settings,
-	})
-	return err
+	o.attachSourceToScenes(name, sl.Scenes)
+	return nil
+}
+
+func sceneHasSource(items []string, name string) bool {
+	for _, n := range items {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *obsClient) attachSourceToScenes(name string, scenes []struct {
+	SceneName string `json:"sceneName"`
+}) {
+	for _, sc := range scenes {
+		raw, err := o.request("GetSceneItemList", map[string]any{"sceneName": sc.SceneName})
+		if err != nil {
+			continue
+		}
+		var items struct {
+			SceneItems []struct {
+				SourceName string `json:"sourceName"`
+			} `json:"sceneItems"`
+		}
+		_ = json.Unmarshal(raw, &items)
+		names := make([]string, 0, len(items.SceneItems))
+		for _, it := range items.SceneItems {
+			names = append(names, it.SourceName)
+		}
+		if sceneHasSource(names, name) {
+			continue
+		}
+		_, _ = o.request("CreateSceneItem", map[string]any{
+			"sceneName":        sc.SceneName,
+			"sourceName":       name,
+			"sceneItemEnabled": true,
+		})
+	}
 }
 
 func (o *obsClient) setScene(name string) error {

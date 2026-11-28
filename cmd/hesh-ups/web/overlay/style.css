@@ -17,11 +17,20 @@ html, body {
   overflow: hidden;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 200ms ease;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+.slot[data-motion="slide"] {
+  transform: translateY(24px);
+}
+
+.slot[data-motion="scale"] {
+  transform: scale(0.92);
 }
 
 .slot.is-on {
   opacity: 1;
+  transform: none;
 }
 
 .slot img, .slot video {

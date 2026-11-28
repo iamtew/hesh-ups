@@ -80,6 +80,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/state", s.handleState)
 	mux.HandleFunc("GET /api/slots", s.handleSlots)
 	mux.HandleFunc("PUT /api/slots/{id}", s.handlePutSlot)
+	mux.HandleFunc("POST /api/slots/{id}/duplicate", s.handleDuplicateSlot)
 	mux.HandleFunc("DELETE /api/slots/{id}", s.handleDeleteSlot)
 	mux.HandleFunc("GET /api/media", s.handleListMedia)
 	mux.HandleFunc("POST /api/media", s.handleUpload)
@@ -233,6 +234,11 @@ func (s *Server) handlePutSlot(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if sl.Look.empty() {
+		sl.Look = defaultLook()
+	} else {
+		sl.Look = sl.Look.norm()
+	}
 	if key, msg := validSlot(sl); key != "" {
 		writeErr(w, 400, key, msg)
 		return
@@ -261,10 +267,19 @@ func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
+func (s *Server) handleDuplicateSlot(w http.ResponseWriter, r *http.Request) {
+	sl, code, key, msg := s.duplicateSlot(r.PathValue("id"))
+	if code != 200 {
+		writeErr(w, code, key, msg)
+		return
+	}
+	writeJSON(w, 200, sl)
+}
+
 func (s *Server) handleFire(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	vars, dur := parseFire(r)
-	text, code, key, msg := s.fire(id, vars, dur)
+	opt := parseFire(r)
+	text, code, key, msg := s.fire(id, opt.Vars, opt)
 	if code != 200 {
 		writeErr(w, code, key, msg)
 		return
@@ -283,44 +298,61 @@ func (s *Server) handleHideAll(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
-func parseFire(r *http.Request) (map[string]string, *int) {
-	vars := map[string]string{}
-	var dur *int
+func parseFire(r *http.Request) fireOpts {
+	opt := fireOpts{Vars: map[string]string{}}
 	q := r.URL.Query()
 	for k, vs := range q {
 		if k == "token" || k == "vars" {
 			continue
 		}
 		if k == "duration_ms" {
-			dur = atoiPtr(vs[0])
+			opt.Dur = atoiPtr(vs[0])
 			continue
 		}
-		vars[k] = vs[0]
+		if k == "media" {
+			opt.Media = vs[0]
+			continue
+		}
+		if k == "volume" {
+			opt.Volume = atoiPtr(vs[0])
+			continue
+		}
+		opt.Vars[k] = vs[0]
 	}
 	if r.Method == http.MethodPost && r.Header.Get("Content-Type") == "application/json" {
 		var body map[string]any
 		if json.NewDecoder(r.Body).Decode(&body) == nil {
 			for k, v := range body {
-				if k == "token" || k == "vars" || k == "duration_ms" {
+				if k == "token" || k == "vars" || k == "duration_ms" || k == "media" || k == "volume" {
 					continue
 				}
-				vars[k] = stringify(v)
+				opt.Vars[k] = stringify(v)
 			}
 			if raw, ok := body["vars"].(map[string]any); ok {
 				for k, v := range raw {
-					vars[k] = stringify(v)
+					opt.Vars[k] = stringify(v)
 				}
 			}
 			if v, ok := body["duration_ms"]; ok {
 				switch n := v.(type) {
 				case float64:
 					i := int(n)
-					dur = &i
+					opt.Dur = &i
+				}
+			}
+			if v, ok := body["media"].(string); ok {
+				opt.Media = v
+			}
+			if v, ok := body["volume"]; ok {
+				switch n := v.(type) {
+				case float64:
+					i := int(n)
+					opt.Volume = &i
 				}
 			}
 		}
 	}
-	return vars, dur
+	return opt
 }
 
 func stringify(v any) string {
@@ -517,12 +549,13 @@ func (s *Server) configMsg() map[string]any {
 		Enabled      bool   `json:"enabled"`
 		ParentID     string `json:"parent_id"`
 		Theme        string `json:"theme"`
+		Look         Look   `json:"look"`
 	}
 	rows := make([]row, 0, len(slots))
 	for _, sl := range slots {
 		rows = append(rows, row{
 			sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath,
-			sl.TextTemplate, sl.Playback, sl.DurationMS, sl.Volume, sl.Enabled, sl.ParentID, sl.Theme,
+			sl.TextTemplate, sl.Playback, sl.DurationMS, sl.Volume, sl.Enabled, sl.ParentID, sl.Theme, sl.Look.norm(),
 		})
 	}
 	return map[string]any{"type": "config", "canvas": map[string]int{"w": cw, "h": ch}, "slots": rows}
@@ -584,15 +617,23 @@ func (s *Server) snapshot() map[string]any {
 		media := ""
 		play := lv.Playback
 		if ok {
-			media = mediaURL(sl)
+			if lv.MediaPath != "" {
+				media = mediaURLKind(sl.MediaKind, lv.MediaPath)
+			} else {
+				media = mediaURL(sl)
+			}
 			play = sl.Playback
 		} else if lv.MediaPath != "" {
 			media = "/media/" + lv.MediaPath
 		}
+		look := lv.Look
+		if look.empty() && ok {
+			look = sl.Look
+		}
 		row := map[string]any{
 			"id": id, "seq": lv.Seq, "media_kind": lv.MediaKind, "media_url": media,
 			"playback": play, "volume": lv.Volume, "text": lv.Text, "theme": lv.Theme,
-			"duration_ms": jsonDur(lv.Duration),
+			"look": look.norm(), "duration_ms": jsonDur(lv.Duration),
 		}
 		if ok && sl.Theme != "" {
 			row["theme"] = sl.Theme

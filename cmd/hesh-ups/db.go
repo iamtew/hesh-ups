@@ -14,7 +14,7 @@ import (
 )
 
 var defaultSettings = map[string]string{
-	"schema_version":     "2",
+	"schema_version":     "3",
 	"bind":               "127.0.0.1",
 	"port":               "18745",
 	"token":              "",
@@ -56,7 +56,7 @@ func migrate(db *sql.DB) error {
 		return createSchema(db)
 	}
 	n, _ := strconv.Atoi(ver)
-	if n > 2 {
+	if n > 3 {
 		return fmt.Errorf("schema_version %d is newer than this binary", n)
 	}
 	if n < 2 {
@@ -69,6 +69,14 @@ func migrate(db *sql.DB) error {
 			if _, err := db.Exec(q); err != nil {
 				return err
 			}
+		}
+	}
+	if n < 3 {
+		if _, err := db.Exec(`ALTER TABLE slots ADD COLUMN look TEXT NOT NULL DEFAULT ''`); err != nil {
+			return err
+		}
+		if _, err := db.Exec(`UPDATE settings SET value='3' WHERE key='schema_version'`); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -94,7 +102,8 @@ func createSchema(db *sql.DB) error {
 			enabled INTEGER NOT NULL DEFAULT 1,
 			css_class TEXT,
 			parent_id TEXT NOT NULL DEFAULT '',
-			theme TEXT NOT NULL DEFAULT 'plain'
+			theme TEXT NOT NULL DEFAULT 'plain',
+			look TEXT NOT NULL DEFAULT ''
 		)`,
 		`CREATE TABLE IF NOT EXISTS event_log (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -138,7 +147,7 @@ func (s *Server) setSetting(key, value string) error {
 	return err
 }
 
-const slotCols = `id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme`
+const slotCols = `id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme,look`
 
 func (s *Server) loadSlots() ([]Slot, error) {
 	rows, err := s.db.Query(`SELECT ` + slotCols + ` FROM slots`)
@@ -166,8 +175,9 @@ func scanSlot(rows interface {
 	var sl Slot
 	var dur sql.NullInt64
 	var css sql.NullString
+	var look string
 	var en int
-	err := rows.Scan(&sl.ID, &sl.Label, &sl.X, &sl.Y, &sl.W, &sl.H, &sl.Z, &sl.MediaKind, &sl.MediaPath, &sl.TextTemplate, &sl.Playback, &dur, &sl.Volume, &en, &css, &sl.ParentID, &sl.Theme)
+	err := rows.Scan(&sl.ID, &sl.Label, &sl.X, &sl.Y, &sl.W, &sl.H, &sl.Z, &sl.MediaKind, &sl.MediaPath, &sl.TextTemplate, &sl.Playback, &dur, &sl.Volume, &en, &css, &sl.ParentID, &sl.Theme, &look)
 	if err != nil {
 		return sl, err
 	}
@@ -182,6 +192,7 @@ func scanSlot(rows interface {
 	if sl.Theme == "" {
 		sl.Theme = "plain"
 	}
+	sl.Look = decodeLook(look)
 	return sl, nil
 }
 
@@ -203,13 +214,13 @@ func (s *Server) upsertSlot(sl Slot) error {
 	if sl.Enabled {
 		en = 1
 	}
-	_, err := s.db.Exec(`INSERT INTO slots(id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+	_, err := s.db.Exec(`INSERT INTO slots(id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme,look)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET label=excluded.label,x=excluded.x,y=excluded.y,w=excluded.w,h=excluded.h,z=excluded.z,
 		media_kind=excluded.media_kind,media_path=excluded.media_path,text_template=excluded.text_template,playback=excluded.playback,
 		duration_ms=excluded.duration_ms,volume=excluded.volume,enabled=excluded.enabled,css_class=excluded.css_class,
-		parent_id=excluded.parent_id,theme=excluded.theme`,
-		sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath, sl.TextTemplate, sl.Playback, dur, sl.Volume, en, sl.CSSClass, sl.ParentID, sl.Theme)
+		parent_id=excluded.parent_id,theme=excluded.theme,look=excluded.look`,
+		sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath, sl.TextTemplate, sl.Playback, dur, sl.Volume, en, sl.CSSClass, sl.ParentID, sl.Theme, encodeLook(sl.Look))
 	return err
 }
 
@@ -280,6 +291,12 @@ func (s *Server) restoreVisible() {
 			continue
 		}
 		lv := liveSlot{Seq: seq, Text: text, MediaKind: kind, MediaPath: path}
+		if sl, ok := s.getSlot(id); ok {
+			lv.Look = sl.Look.norm()
+			lv.Theme = sl.Theme
+			lv.Playback = sl.Playback
+			lv.Volume = sl.Volume
+		}
 		if kind == "group" && text != "" {
 			var mar []showMember
 			if json.Unmarshal([]byte(text), &mar) == nil {

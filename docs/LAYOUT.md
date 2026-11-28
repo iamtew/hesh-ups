@@ -187,6 +187,7 @@ cmd/hesh-ups/
       icons.svg             # same sprite as docs/vendor/tabler/icons.svg
     shared/
       banner.css            # text popup shell tokens
+      look.js               # text fit / type knobs on overlay + composer
       themes/<id>/theme.css + theme.js
       vendor/pixi/          # PixiJS MIT pin + LICENSE
 ```

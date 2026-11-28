@@ -419,6 +419,7 @@
         add(wrap);
         var fx = themeFx();
         if (theme !== "plain" && fx[theme] && fx[theme].start) fx[theme].start(wrap);
+        if (window.applyLook) window.applyLook(el, s.look);
       }
     }
     var name = document.createElement("div");
@@ -455,6 +456,7 @@
     if (ft) s.text_template = ft.value;
     var fth = document.getElementById("f-theme");
     if (fth) s.theme = fth.value;
+    if (document.getElementById("f-font-size")) s.look = lookFromForm(s);
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
     if (el) {
       placeBox(el, s);
@@ -593,6 +595,19 @@
         html += '<option value="' + th.id + '"' + ((s.theme || "plain") === th.id ? " selected" : "") + ">" + th.name + "</option>";
       });
       html += "</select></label>";
+      var lk = s.look || {};
+      html += '<div class="geom">' +
+        '<label>size <input id="f-font-size" type="number" min="8" max="400" value="' + (lk.font_size || 24) + '"></label>' +
+        '<label>weight <select id="f-font-weight"><option value="400">400</option><option value="600">600</option><option value="700">700</option></select></label>' +
+        '<label>fill <input id="f-fill" type="text" value="' + esc(lk.fill || "#ffffff") + '"></label>' +
+        '<label>stroke <input id="f-stroke" type="text" value="' + esc(lk.stroke || "#111111") + '"></label>' +
+        '<label>stroke_w <input id="f-stroke-w" type="number" min="0" max="20" value="' + (lk.stroke_w != null ? lk.stroke_w : 3) + '"></label>' +
+        '<label>align <select id="f-align"><option value="left">left</option><option value="center">center</option><option value="right">right</option></select></label>' +
+        '<label class="span">fit <select id="f-fit"><option value="shrink">shrink</option><option value="wrap">wrap</option><option value="ellipsis">ellipsis</option></select></label>' +
+        "</div>";
+    }
+    if (!child) {
+      html += '<label>motion <select id="f-motion"><option value="fade">fade</option><option value="slide">slide</option><option value="scale">scale</option></select></label>';
     }
     if (kind === "image" || kind === "gif" || kind === "video" || kind === "audio") {
       html += '<label>file <input id="f-file" type="file"></label>';
@@ -621,13 +636,25 @@
       '<button type="button" id="f-test">' + icon("player-play") + " Test</button>" +
       '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button></div>" +
       '<div class="row">';
-    if (!child) actions += '<button type="button" id="f-copy" title="Copy trigger URL">' + icon("link") + " Copy URL</button>";
+    if (!child) {
+      actions += '<button type="button" id="f-copy" title="Copy trigger URL">' + icon("link") + " Copy URL</button>";
+      actions += '<button type="button" id="f-dup">' + icon("copy") + " Duplicate</button>";
+    }
     actions += '<button type="button" id="f-del">' + icon("trash") + " Trash</button></div>";
     inspectorActions.innerHTML = actions;
     inspectorActions.hidden = false;
     document.getElementById("f-kind").value = kind;
     var play = document.getElementById("f-play");
     if (play) play.value = s.playback || "once";
+    var lk = s.look || {};
+    var fw = document.getElementById("f-font-weight");
+    if (fw) fw.value = String(lk.font_weight || 600);
+    var al = document.getElementById("f-align");
+    if (al) al.value = lk.align || "center";
+    var fi = document.getElementById("f-fit");
+    if (fi) fi.value = lk.fit || "shrink";
+    var mo = document.getElementById("f-motion");
+    if (mo) mo.value = lk.motion || "fade";
     var mediaSel = document.getElementById("f-media");
     if (mediaSel) {
       fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
@@ -651,6 +678,20 @@
     var el = document.getElementById(id);
     if (!el) return fallback;
     return el.value;
+  }
+
+  function lookFromForm(s) {
+    var prev = s.look || {};
+    return {
+      font_size: +val("f-font-size", prev.font_size || 24),
+      font_weight: +val("f-font-weight", prev.font_weight || 600),
+      fill: val("f-fill", prev.fill || "#ffffff"),
+      stroke: val("f-stroke", prev.stroke || "#111111"),
+      stroke_w: +val("f-stroke-w", prev.stroke_w != null ? prev.stroke_w : 3),
+      align: val("f-align", prev.align || "center"),
+      fit: val("f-fit", prev.fit || "shrink"),
+      motion: val("f-motion", prev.motion || "fade"),
+    };
   }
 
   function readForm(s) {
@@ -677,6 +718,7 @@
       theme: val("f-theme", s.theme || "plain"),
       parent_id: s.parent_id || "",
       enabled: s.enabled,
+      look: lookFromForm(s),
     };
     if (kind !== "text") body.theme = "plain";
     if (kind !== "text") body.text_template = kind === "group" ? "" : body.text_template;
@@ -796,6 +838,16 @@
     if (id === "f-copy") {
       copyText(popupURL(fireId(s))).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
     }
+    if (id === "f-dup") {
+      fetch("/api/slots/" + encodeURIComponent(s.id) + "/duplicate", { method: "POST" }).then(function (r) {
+        if (!r.ok) return errMsg(r).then(setStatus);
+        return r.json().then(function (sl) {
+          sel = sl.id;
+          setStatus("Duplicated " + sl.id);
+          return load();
+        });
+      }).catch(function () { setStatus("Duplicate failed"); });
+    }
     if (id === "f-add-member") {
       var kind = (document.getElementById("f-add-kind") || {}).value || "text";
       var n = 1;
@@ -831,7 +883,8 @@
   });
   inspector.addEventListener("input", function (e) {
     var id = e.target.id;
-    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label" || id === "f-text" || id === "f-theme") {
+    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label" || id === "f-text" || id === "f-theme" ||
+        id === "f-font-size" || id === "f-font-weight" || id === "f-fill" || id === "f-stroke" || id === "f-stroke-w" || id === "f-align" || id === "f-fit") {
       applyInspectorPreview();
     }
   });
@@ -858,7 +911,8 @@
       return;
     }
     if (e.target.id === "f-id") return;
-    var persistIds = { "f-x": 1, "f-y": 1, "f-w": 1, "f-h": 1, "f-z": 1, "f-label": 1, "f-kind": 1, "f-text": 1, "f-play": 1, "f-dur": 1, "f-vol": 1, "f-theme": 1 };
+    var persistIds = { "f-x": 1, "f-y": 1, "f-w": 1, "f-h": 1, "f-z": 1, "f-label": 1, "f-kind": 1, "f-text": 1, "f-play": 1, "f-dur": 1, "f-vol": 1, "f-theme": 1,
+      "f-font-size": 1, "f-font-weight": 1, "f-fill": 1, "f-stroke": 1, "f-stroke-w": 1, "f-align": 1, "f-fit": 1, "f-motion": 1 };
     if (!persistIds[e.target.id]) return;
     var s = slotById(sel);
     if (!s) return;
