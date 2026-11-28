@@ -575,7 +575,7 @@ Windows. `just build` → one exe (overlay + composer + triggers compiled in). `
 
 `just test` is `go test ./...` (and `go vet`). **In-process:** construct the HTTP handler, `httptest.NewServer` or `ServeHTTP` on `httptest.ResponseRecorder`. Temp dir for `HESH_UPS_DB` + `media/`. Use the same `embed.FS` as production.
 
-MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`).
+MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`). `just test` stays in-process and off `:18745`; a Clanker looking at the live overlay uses the process already bound there.
 
 `just test` must fail if any required case fails.
 
