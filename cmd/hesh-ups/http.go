@@ -103,8 +103,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /composer", redirectSlash)
 	overlay, _ := fs.Sub(webFS, "web/overlay")
 	composer, _ := fs.Sub(webFS, "web/composer")
+	shared, _ := fs.Sub(webFS, "web/shared")
 	mux.Handle("/overlay/", http.StripPrefix("/overlay/", http.FileServer(http.FS(overlay))))
 	mux.Handle("/composer/", http.StripPrefix("/composer/", http.FileServer(http.FS(composer))))
+	mux.Handle("/shared/", http.StripPrefix("/shared/", http.FileServer(http.FS(shared))))
 	mux.HandleFunc("GET /media/", s.handleMediaFile)
 	return mux
 }
@@ -209,13 +211,39 @@ func (s *Server) handlePutSlot(w http.ResponseWriter, r *http.Request) {
 	if sl.Playback == "" {
 		sl.Playback = "once"
 	}
+	if sl.Theme == "" {
+		sl.Theme = "plain"
+	}
+	if sl.MediaKind != "text" {
+		sl.Theme = "plain"
+		if sl.MediaKind != "group" {
+			sl.TextTemplate = ""
+		}
+	}
+	if sl.MediaKind == "text" || sl.MediaKind == "group" {
+		sl.MediaPath = ""
+	}
+	if sl.MediaKind == "group" {
+		sl.TextTemplate = ""
+	}
+	if sl.ParentID != "" {
+		p, ok := s.getSlot(sl.ParentID)
+		if !ok || p.MediaKind != "group" || p.ID == sl.ID {
+			writeErr(w, 400, "invalid_slot", "invalid parent")
+			return
+		}
+	}
 	if key, msg := validSlot(sl); key != "" {
 		writeErr(w, 400, key, msg)
 		return
 	}
+	old, had := s.getSlot(id)
 	if err := s.upsertSlot(sl); err != nil {
 		writeErr(w, 500, "error", err.Error())
 		return
+	}
+	if had && old.MediaKind == "group" && sl.MediaKind != "group" {
+		_, _ = s.db.Exec(`DELETE FROM slots WHERE parent_id=?`, id)
 	}
 	s.broadcastConfig()
 	writeJSON(w, 200, sl)
@@ -223,7 +251,11 @@ func (s *Server) handlePutSlot(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleDeleteSlot(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	if sl, ok := s.getSlot(id); ok && sl.ParentID != "" {
+		s.hide(sl.ParentID, "delete")
+	}
 	s.hide(id, "delete")
+	_, _ = s.db.Exec(`DELETE FROM slots WHERE parent_id=?`, id)
 	_, _ = s.db.Exec(`DELETE FROM slots WHERE id=?`, id)
 	s.broadcastConfig()
 	writeJSON(w, 200, map[string]any{"ok": true})
@@ -483,13 +515,14 @@ func (s *Server) configMsg() map[string]any {
 		DurationMS   *int   `json:"duration_ms"`
 		Volume       int    `json:"volume"`
 		Enabled      bool   `json:"enabled"`
-		CSSClass     string `json:"css_class"`
+		ParentID     string `json:"parent_id"`
+		Theme        string `json:"theme"`
 	}
 	rows := make([]row, 0, len(slots))
 	for _, sl := range slots {
 		rows = append(rows, row{
 			sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath,
-			sl.TextTemplate, sl.Playback, sl.DurationMS, sl.Volume, sl.Enabled, sl.CSSClass,
+			sl.TextTemplate, sl.Playback, sl.DurationMS, sl.Volume, sl.Enabled, sl.ParentID, sl.Theme,
 		})
 	}
 	return map[string]any{"type": "config", "canvas": map[string]int{"w": cw, "h": ch}, "slots": rows}
@@ -556,10 +589,20 @@ func (s *Server) snapshot() map[string]any {
 		} else if lv.MediaPath != "" {
 			media = "/media/" + lv.MediaPath
 		}
-		vis = append(vis, map[string]any{
+		row := map[string]any{
 			"id": id, "seq": lv.Seq, "media_kind": lv.MediaKind, "media_url": media,
-			"playback": play, "text": lv.Text, "duration_ms": jsonDur(lv.Duration),
-		})
+			"playback": play, "volume": lv.Volume, "text": lv.Text, "theme": lv.Theme,
+			"duration_ms": jsonDur(lv.Duration),
+		}
+		if ok && sl.Theme != "" {
+			row["theme"] = sl.Theme
+		}
+		if lv.MediaKind == "group" {
+			row["members"] = lv.Members
+			row["media_url"] = ""
+			row["text"] = ""
+		}
+		vis = append(vis, row)
 	}
 	if vis == nil {
 		vis = []map[string]any{}

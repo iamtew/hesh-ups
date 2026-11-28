@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 )
 
 var defaultSettings = map[string]string{
-	"schema_version":     "1",
+	"schema_version":     "2",
 	"bind":               "127.0.0.1",
 	"port":               "18745",
 	"token":              "",
@@ -55,8 +56,20 @@ func migrate(db *sql.DB) error {
 		return createSchema(db)
 	}
 	n, _ := strconv.Atoi(ver)
-	if n > 1 {
+	if n > 2 {
 		return fmt.Errorf("schema_version %d is newer than this binary", n)
+	}
+	if n < 2 {
+		for _, q := range []string{
+			`ALTER TABLE slots ADD COLUMN parent_id TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE slots ADD COLUMN theme TEXT NOT NULL DEFAULT 'plain'`,
+			`UPDATE slots SET media_kind='text' WHERE media_kind='none'`,
+			`UPDATE settings SET value='2' WHERE key='schema_version'`,
+		} {
+			if _, err := db.Exec(q); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }
@@ -79,7 +92,9 @@ func createSchema(db *sql.DB) error {
 			duration_ms INTEGER,
 			volume INTEGER NOT NULL DEFAULT 100,
 			enabled INTEGER NOT NULL DEFAULT 1,
-			css_class TEXT
+			css_class TEXT,
+			parent_id TEXT NOT NULL DEFAULT '',
+			theme TEXT NOT NULL DEFAULT 'plain'
 		)`,
 		`CREATE TABLE IF NOT EXISTS event_log (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -123,8 +138,10 @@ func (s *Server) setSetting(key, value string) error {
 	return err
 }
 
+const slotCols = `id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme`
+
 func (s *Server) loadSlots() ([]Slot, error) {
-	rows, err := s.db.Query(`SELECT id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class FROM slots`)
+	rows, err := s.db.Query(`SELECT ` + slotCols + ` FROM slots`)
 	if err != nil {
 		return nil, err
 	}
@@ -150,7 +167,7 @@ func scanSlot(rows interface {
 	var dur sql.NullInt64
 	var css sql.NullString
 	var en int
-	err := rows.Scan(&sl.ID, &sl.Label, &sl.X, &sl.Y, &sl.W, &sl.H, &sl.Z, &sl.MediaKind, &sl.MediaPath, &sl.TextTemplate, &sl.Playback, &dur, &sl.Volume, &en, &css)
+	err := rows.Scan(&sl.ID, &sl.Label, &sl.X, &sl.Y, &sl.W, &sl.H, &sl.Z, &sl.MediaKind, &sl.MediaPath, &sl.TextTemplate, &sl.Playback, &dur, &sl.Volume, &en, &css, &sl.ParentID, &sl.Theme)
 	if err != nil {
 		return sl, err
 	}
@@ -162,11 +179,14 @@ func scanSlot(rows interface {
 	if css.Valid {
 		sl.CSSClass = css.String
 	}
+	if sl.Theme == "" {
+		sl.Theme = "plain"
+	}
 	return sl, nil
 }
 
 func (s *Server) getSlot(id string) (Slot, bool) {
-	row := s.db.QueryRow(`SELECT id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class FROM slots WHERE id=?`, id)
+	row := s.db.QueryRow(`SELECT `+slotCols+` FROM slots WHERE id=?`, id)
 	sl, err := scanSlot(row)
 	if err != nil {
 		return Slot{}, false
@@ -183,13 +203,31 @@ func (s *Server) upsertSlot(sl Slot) error {
 	if sl.Enabled {
 		en = 1
 	}
-	_, err := s.db.Exec(`INSERT INTO slots(id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class)
-		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+	_, err := s.db.Exec(`INSERT INTO slots(id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,duration_ms,volume,enabled,css_class,parent_id,theme)
+		VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
 		ON CONFLICT(id) DO UPDATE SET label=excluded.label,x=excluded.x,y=excluded.y,w=excluded.w,h=excluded.h,z=excluded.z,
 		media_kind=excluded.media_kind,media_path=excluded.media_path,text_template=excluded.text_template,playback=excluded.playback,
-		duration_ms=excluded.duration_ms,volume=excluded.volume,enabled=excluded.enabled,css_class=excluded.css_class`,
-		sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath, sl.TextTemplate, sl.Playback, dur, sl.Volume, en, sl.CSSClass)
+		duration_ms=excluded.duration_ms,volume=excluded.volume,enabled=excluded.enabled,css_class=excluded.css_class,
+		parent_id=excluded.parent_id,theme=excluded.theme`,
+		sl.ID, sl.Label, sl.X, sl.Y, sl.W, sl.H, sl.Z, sl.MediaKind, sl.MediaPath, sl.TextTemplate, sl.Playback, dur, sl.Volume, en, sl.CSSClass, sl.ParentID, sl.Theme)
 	return err
+}
+
+func (s *Server) childSlots(parentID string) []Slot {
+	rows, err := s.db.Query(`SELECT `+slotCols+` FROM slots WHERE parent_id=? ORDER BY z ASC`, parentID)
+	if err != nil {
+		return nil
+	}
+	defer rows.Close()
+	var out []Slot
+	for rows.Next() {
+		sl, err := scanSlot(rows)
+		if err != nil {
+			continue
+		}
+		out = append(out, sl)
+	}
+	return out
 }
 
 func (s *Server) logEvent(action, slotID, detail, result string) {
@@ -241,7 +279,15 @@ func (s *Server) restoreVisible() {
 		if rows.Scan(&id, &seq, &text, &kind, &path) != nil {
 			continue
 		}
-		s.live[id] = liveSlot{Seq: seq, Text: text, MediaKind: kind, MediaPath: path}
+		lv := liveSlot{Seq: seq, Text: text, MediaKind: kind, MediaPath: path}
+		if kind == "group" && text != "" {
+			var mar []showMember
+			if json.Unmarshal([]byte(text), &mar) == nil {
+				lv.Members = mar
+				lv.Text = ""
+			}
+		}
+		s.live[id] = lv
 		if seq > s.seq[id] {
 			s.seq[id] = seq
 		}

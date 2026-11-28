@@ -10,7 +10,7 @@ A systray Go app that:
 
 - Serves a transparent overlay page for an OBS Browser Source.
 - Lets the operator place **named slots** on a canvas (composer in WebView).
-- Each slot is **media and/or a text template**. Fire fills `{placeholders}` from the trigger query/JSON.
+- Each slot is **one kind**: text, image, gif, video, audio, or a **group** of those. Fire fills `{placeholders}` on text from the trigger query/JSON.
 - Fires and hides those slots over HTTP (Streamer.bot, browser, Clanker tests).
 - Pushes show/hide to the overlay over **WebSocket**.
 - Talks to **obs-websocket v5**: connect, status, reconnect, create/update the Browser Source, switch scenes.
@@ -23,12 +23,12 @@ hesh-ups is a **named, laid-out overlay**. Streamer.bot (or anything that can hi
 
 | Who | Job |
 | --- | --- |
-| Operator | Lay out a 1080 (or custom) overlay once in a WYSIWYG composer: drag slots, pick files, write a text template, set play-once or loop, optional max duration. The stage shows media and sample-filled text as OBS will. |
-| Operator | Copy one trigger URL per slot and paste it into Streamer.bot / Stream Deck HTTP / a browser. |
+| Operator | Lay out a 1080 (or custom) overlay once in a WYSIWYG composer: drag slots, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. The stage shows media and sample-filled banners as OBS will. |
+| Operator | Copy one trigger URL per top-level slot (group members are not fireable) and paste it into Streamer.bot / Stream Deck HTTP / a browser. |
 | Operator | Preview the same overlay in a WebView without guessing what OBS will show. |
 | Operator | Test-fire a slot from the composer (same URL as production), including sample `{user}` text. |
 | Operator | Add **one** transparent Browser Source the size of the canvas and be done. Audio is routed into OBS (`reroute_audio`). |
-| Viewer | When the URL is hit, the slot’s media and/or rendered text **appears on stream** at that position. |
+| Viewer | When the URL is hit, that slot (or group) **appears on stream** at its position. |
 | Viewer | Play-once: the clip/sound runs **once**. Loop: it **repeats until hide or max duration**. |
 | Viewer | Spam the same URL: the slot **restarts** (no stacked copies of one slot). Other slots can show at the same time. |
 | Operator | Hide a slot or hide all when the bit is over. Optional: switch an OBS scene from composer or HTTP. |
@@ -122,7 +122,7 @@ Visible slot state is process memory **and** a small `visible` table so **sticky
 
 ### Schema version
 
-`settings` key `schema_version` = `1`. Empty file: create tables and write defaults. On open: if version lower, migrate; if higher, refuse to start. Schema 1 is create-only (no seeded product exists yet).
+`settings` key `schema_version` = `2`. Empty file: create tables and write defaults. On open: if version lower, migrate; if higher, refuse to start. Schema 2 adds `parent_id` and `theme`, and rewrites `media_kind=none` → `text`.
 
 ### `settings` (kv)
 
@@ -162,20 +162,22 @@ CREATE TABLE slots (
   w             INTEGER NOT NULL,
   h             INTEGER NOT NULL,
   z             INTEGER NOT NULL DEFAULT 0,
-  media_kind    TEXT NOT NULL,    -- none | image | gif | video | audio
-  media_path    TEXT NOT NULL DEFAULT '', -- relative to media/ or absolute; empty if none
-  text_template TEXT NOT NULL DEFAULT '', -- empty = no text; `{name}` placeholders
+  media_kind    TEXT NOT NULL,    -- text | image | gif | video | audio | group
+  media_path    TEXT NOT NULL DEFAULT '', -- relative to media/; empty for text/group
+  text_template TEXT NOT NULL DEFAULT '', -- `{name}` placeholders; text kind only
   playback      TEXT NOT NULL DEFAULT 'once', -- once | loop
-  duration_ms   INTEGER,          -- NULL = no wall-clock cap (see playback)
+  duration_ms   INTEGER,          -- NULL = no wall-clock cap (see playback); lives on the fireable slot (group, not children)
   volume        INTEGER NOT NULL DEFAULT 100, -- 0–100, video/audio element
   enabled       INTEGER NOT NULL DEFAULT 1, -- 0 = layer eye off; fire is 404
-  css_class     TEXT              -- [a-zA-Z0-9_-]+ or empty; inspector field
+  css_class     TEXT,             -- leftover column; API ignores it
+  parent_id     TEXT NOT NULL DEFAULT '', -- child of a group; empty = top-level
+  theme         TEXT NOT NULL DEFAULT 'plain' -- text kind: plain | lcd-glass | sesh-glass | sesh-glass-old | 3026-d3c0
 );
 ```
 
-`id` is the trigger name. Must match `[a-z0-9-]+`. Reserved: `hide_all` (the hide-all route). Several slots may show at once. They may overlap; higher `z` is on top.
+`id` is the trigger name. Must match `[a-z0-9-]+`. Reserved: `hide_all` (the hide-all route). Several top-level slots may show at once. They may overlap; higher `z` is on top.
 
-A slot must have **media** (`media_kind` ≠ `none` and a non-empty `media_path`) **and/or** a non-empty `text_template`. `PUT` with neither → `400`. Composer copies picked files into `media/` and stores a path relative to that folder. `GET /media/...` only serves files under `media/` (reject `..` and absolute paths).
+Kinds are **exclusive**. `text` needs a non-empty `text_template`. `image`/`gif`/`video`/`audio` need a non-empty `media_path`. `group` is a container: children have `parent_id` set to the group id; child `x,y` are relative to the group box. Nested groups are rejected. Empty group may be saved; **fire** of an empty group → `400` `empty_slot`. Child fire URL → `404` `unknown_slot`. Composer copies picked files into `media/` and stores a path relative to that folder. `GET /media/...` only serves files under `media/` (reject `..` and absolute paths).
 
 ### Slot playback and hide
 
@@ -193,6 +195,9 @@ Two knobs, independent:
 | `playback=once`, video/audio, `duration_ms` null | Overlay sends `ended`; server hides. |
 | `playback=once`, video/audio, `duration_ms` set | Hide at duration even if the file is longer (cut). If the file ends first, **hold last frame / silence** until duration (do not loop). |
 | Image/gif/text, `duration_ms` null or `<= 0` | Sticky until hide. Zero is not a timer. |
+| Group, `duration_ms` set | Hide the whole group at that wall-clock. |
+| Group, `duration_ms` null, only play-once video/audio children (no `loop`) | Overlay sends `ended` on the **group** id when the last once-media ends; server hides. |
+| Group, `duration_ms` null, no once-media or any child `loop` | Sticky until hide. |
 
 Retrigger while visible: restart media from the start, re-render text, restart the duration timer.
 
@@ -280,7 +285,8 @@ GET and POST are both accepted on fire/hide/hide_all/scene so Streamer.bot “op
       "duration_ms": null,
       "volume": 100,
       "enabled": true,
-      "css_class": "",
+      "parent_id": "",
+      "theme": "plain",
       "visible": false,
       "text": ""
     }
@@ -322,9 +328,9 @@ Example: `GET /api/popup/follow?user=Ada&amount=1` with template `Thanks {user}!
 
 `GET /api/slots` — all slots (no visible flag required; `/api/state` is the live view).
 
-`PUT /api/slots/{id}` — upsert one slot (JSON body = columns; if body has `id` it must match the URL). Invalid slug, reserved id, `media_kind`, `playback`, `css_class`, or neither media nor text → `400`.
+`PUT /api/slots/{id}` — upsert one slot (JSON body = columns; if body has `id` it must match the URL). Invalid slug, reserved id, `media_kind`, `playback`, `theme`, bad `parent_id`, or empty payload for that kind → `400`.
 
-`DELETE /api/slots/{id}` — remove slot; if visible, hide first.
+`DELETE /api/slots/{id}` — remove slot; if visible, hide first. Deleting a group also deletes its children.
 
 `GET /api/media` — `{"files":[{"path":"logo.png","kind":"image"}]}` from the `media/` directory (no table).
 
@@ -367,26 +373,26 @@ Server → overlay:
 
 ```json
 {"type": "config", "canvas": {"w": 1920, "h": 1080}, "slots": [ /* slot rows without visible/text */ ]}
-{"type": "snapshot", "visible": [{"id": "follow", "seq": 1, "media_kind": "image", "media_url": "/media/heart.png", "playback": "once", "text": "Thanks Ada!", "duration_ms": 5000}]}
-{"type": "show", "slot": "follow", "seq": 1, "media_kind": "image", "media_url": "/media/heart.png", "playback": "once", "volume": 100, "text": "Thanks Ada!", "duration_ms": 5000}
+{"type": "snapshot", "visible": [{"id": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "text": "Thanks Ada!", "theme": "plain", "duration_ms": 5000}]}
+{"type": "show", "slot": "follow", "seq": 1, "media_kind": "text", "media_url": "", "playback": "once", "volume": 100, "text": "Thanks Ada!", "theme": "lcd-glass", "duration_ms": 5000}
 {"type": "hide", "slot": "follow"}
 {"type": "clear"}
 ```
 
-`media_url` is `""` when `media_kind` is `none`. `text` is already rendered and HTML-escaped. `seq` is a per-slot integer. First fire is `1`; each new fire adds one. Restart of the process starts at `1` again.
+`media_url` is `""` when `media_kind` is `text` or `group`. `text` is already rendered and HTML-escaped. `theme` is the text banner id (`plain` = stroke text, no Pixi). Group `show` includes `members` (relative `x,y,w,h`, per-child media/text/theme). `seq` is a per-slot integer. First fire is `1`; each new fire adds one. Restart of the process starts at `1` again. Group `ended` uses the group id and group `seq`.
 
 - `config` on connect and after slot or canvas save.
 - `snapshot` on connect: enough to redraw visible slots (seq, media, rendered text).
 - Live: `show` / `hide` / `clear` (hide_all).
 - Overlay hides on `hide` / `clear` only. It reports `ended`; the server decides and broadcasts `hide`.
 
-Overlay DOM: one node per slot (`css_class` if set), positioned with `x,y,w,h`, `z-index`. Hidden = not shown. Background transparent. Body fills the canvas. Image/gif = `<img>`. Video = `<video autoplay>` with `loop` only if `playback=loop`, `volume` = slot `volume/100`. Audio = `<audio autoplay>` same `loop` and `volume`. Text = a `<div>` at the bottom of the slot (white text, dark stroke). Fade CSS ~200ms.
+Overlay DOM: one node per **top-level** slot, class `slot popup`, positioned with `x,y,w,h`, `z-index`. Hidden = not shown. Background transparent. Body fills the canvas. Image/gif = `<img>`. Video = `<video autoplay>` with `loop` only if `playback=loop`, `volume` = slot `volume/100`. Audio = `<audio autoplay>` same `loop` and `volume`. Text = `.banner-content` (`.theme-panel` when theme ≠ `plain`) wrapping escaped `.banner-text`; `data-theme` on `.popup`; Pixi `start`/`stop` from embedded `SeshThemes`. Group = the group box with member `.popup` children at relative coords. Fade CSS ~200ms. Shared CSS/JS at `/shared/` (banner shell, themes, vendored Pixi). No disk skins.
 
 ---
 
 ## Composer
 
-Page `/composer/`. Files: `web/composer/index.html`, `style.css`, `app.js`. Vanilla. **No npm, no bundler, no interact.js.** Pointer events in `app.js` (same idea as jb2 Overlay Stage, not a copy of its themes/visualizers).
+Page `/composer/`. Files: `web/composer/index.html`, `style.css`, `app.js`, plus `/shared/` (banner + themes + Pixi). Vanilla. **No npm, no bundler, no interact.js.** Pointer events in `app.js`.
 
 Look: **house designer chrome** (same as Border Studio / Show Credits), not a website. Cyan selection (`#00ffff`), not Border Studio lime.
 
@@ -404,11 +410,11 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 
 **Settings** is a blur modal with left nav, not a workspace tab. **OBS:** host, port, password, Browser Source name, status, create/update Browser Source. Save on close (`PUT /api/settings`); writing `obs_*` kicks the websocket so a new password is used immediately. **App:** Run at login, fire token. No Connect/Disconnect UI — background reconnect.
 
-**Layers (left ~240px):** slot list, front = high `z`. Click selects. Eye toggles `enabled`. **+** adds a slot (`id` `slot-n`, `media_kind` `none`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`). Empty canvas: one hint, no fake sample slot. No jb2 visualizers, no themes.
+**Layers (left ~240px):** slot list, front = high `z`. Group children indent under the group. Click selects. Eye toggles `enabled`. **+** adds a top-level **text** slot (`id` `slot-n`, `theme` `plain`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`; group deletes children). Empty canvas: one hint, no fake sample slot. No jb2 visualizers. Text themes are the embedded banner set, not disk skins.
 
 **Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **WYSIWYG** of overlay slot content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). Grid, cyan handles, and layer `label` are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page. Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
-**Inspector (right ~280px):** slot only — id, **label** (layer-list name only, not on the stage), x y w h z (sync with the box: typing updates the box live; **`PUT /api/slots/{id}` on change/blur**, same as pointerup). media_kind, file input → `POST /api/media`, pick existing from `GET /api/media` (saves on change), **text_template** (updates the stage live), playback, duration_ms (blank = sticky until hide), **volume** 0–100, **css_class**, **Test**, **Hide**, copy trigger URL, Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
+**Inspector (right ~280px):** slot only — id, **label**, x y w h z (typing updates the box live; **`PUT` on change/blur** / pointerup). **type** first (`text` / `image` / `gif` / `video` / `audio` / `group`). Only knobs for that kind: text → template + theme; image/gif → file; video/audio → file + playback + volume; group → member list + Add member. Duration on the fireable slot (not on children). **Test** / **Hide** / copy trigger URL use the group id for members. Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 
 If `/api/state` polling fails, a full-window down banner: application not running.
 
@@ -618,7 +624,7 @@ MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:1
 
 ### R14 — text template
 
-**Given** slot `follow` with `text_template` `Thanks {user}!`, `media_kind` `none`  
+**Given** slot `follow` with `text_template` `Thanks {user}!`, `media_kind` `text`  
 **When** `POST /api/popup/follow?user=Ada`  
 **Then** response `"text": "Thanks Ada!"`; WS `show` has the same `text`; state `visible` true
 
@@ -627,7 +633,7 @@ MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:1
 
 ### R15 — reject empty slot
 
-**When** `PUT /api/slots/empty` with `media_kind=none` and empty `text_template`  
+**When** `PUT /api/slots/empty` with `media_kind=text` and empty `text_template`  
 **Then** 400
 
 ### R16 — loop max duration

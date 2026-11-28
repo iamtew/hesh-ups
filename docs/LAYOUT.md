@@ -185,6 +185,10 @@ cmd/hesh-ups/
       style.css
       app.js
       icons.svg             # same sprite as docs/vendor/tabler/icons.svg
+    shared/
+      banner.css            # text popup shell tokens
+      themes/<id>/theme.css + theme.js
+      vendor/pixi/          # PixiJS MIT pin + LICENSE
 ```
 
 `package main`. Tests in `package main` (same package) so they can call the server without exporting a library. MUST NOT extract `internal/` until a second binary exists.
@@ -211,7 +215,7 @@ This is the **only** overlay/composer source. Compiled into the exe. Not Pages. 
 | --- | --- |
 | `cmd/hesh-ups/web/overlay/` | `/overlay/` (`index.html`, `style.css`, `app.js`) |
 | `cmd/hesh-ups/web/composer/` | `/composer/` (designer chrome: bar, layers, canvas, inspector, settings modal, `favicon.png`) |
-| `cmd/hesh-ups/web/shared/` | omit until both pages actually share a file |
+| `cmd/hesh-ups/web/shared/` | `/shared/` (banner.css, themes, vendored Pixi). Overlay and composer both load these. |
 
 `package main` MUST `//go:embed all:web` and serve that `embed.FS`. `just run` / `just test` / dist / MSI all use the same embed. HTTP 301 `/overlay` → `/overlay/` and `/composer` → `/composer/` so relative assets resolve. Composer and overlay are **vanilla** HTML/CSS/JS (hesh-ups.md); no npm in this tree.
 

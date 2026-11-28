@@ -2,7 +2,7 @@
 
 Bind `127.0.0.1:18745`. GET and POST both work on fire/hide so “open URL” clients work.
 
-- Fire: `GET /api/popup/{id}?user=Ada`
+- Fire: `GET /api/popup/{id}?user=Ada` (group id fires the whole group; member ids 404)
 - Hide: `/api/popup/{id}/hide`
 - Hide all: `/api/popup/hide_all`
 

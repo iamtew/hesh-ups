@@ -30,15 +30,7 @@ html, body {
   object-fit: contain;
 }
 
-.slot .text {
+.slot .member {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 0.25em 0.4em;
-  color: #fff;
-  font: 600 24px/1.2 system-ui, sans-serif;
-  text-align: center;
-  -webkit-text-stroke: 3px #111;
-  paint-order: stroke fill;
+  overflow: hidden;
 }

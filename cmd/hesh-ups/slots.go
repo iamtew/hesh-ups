@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"html"
 	"regexp"
 	"strconv"
@@ -8,10 +9,28 @@ import (
 )
 
 var (
-	slotIDRe   = regexp.MustCompile(`^[a-z0-9-]+$`)
-	cssClassRe = regexp.MustCompile(`^[a-zA-Z0-9_-]*$`)
-	phRe       = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
+	slotIDRe = regexp.MustCompile(`^[a-z0-9-]+$`)
+	phRe     = regexp.MustCompile(`\{([A-Za-z_][A-Za-z0-9_]*)\}`)
 )
+
+var themes = map[string]bool{
+	"plain": true, "lcd-glass": true, "sesh-glass": true, "sesh-glass-old": true, "3026-d3c0": true,
+}
+
+type showMember struct {
+	ID        string `json:"id"`
+	MediaKind string `json:"media_kind"`
+	MediaURL  string `json:"media_url"`
+	Playback  string `json:"playback"`
+	Volume    int    `json:"volume"`
+	Text      string `json:"text"`
+	Theme     string `json:"theme"`
+	X         int    `json:"x"`
+	Y         int    `json:"y"`
+	W         int    `json:"w"`
+	H         int    `json:"h"`
+	Z         int    `json:"z"`
+}
 
 type liveSlot struct {
 	Seq       int
@@ -20,7 +39,10 @@ type liveSlot struct {
 	MediaPath string
 	Playback  string
 	Volume    int
+	Theme     string
 	Duration  *int
+	Members   []showMember
+	WaitEnded bool
 }
 
 type Slot struct {
@@ -38,7 +60,9 @@ type Slot struct {
 	DurationMS   *int   `json:"duration_ms"`
 	Volume       int    `json:"volume"`
 	Enabled      bool   `json:"enabled"`
-	CSSClass     string `json:"css_class"`
+	CSSClass     string `json:"css_class,omitempty"`
+	ParentID     string `json:"parent_id"`
+	Theme        string `json:"theme"`
 	Visible      bool   `json:"visible,omitempty"`
 	Text         string `json:"text,omitempty"`
 }
@@ -54,8 +78,21 @@ type Event struct {
 
 func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text string, code int, errKey, errMsg string) {
 	sl, ok := s.getSlot(id)
-	if !ok || !sl.Enabled {
+	if !ok || !sl.Enabled || sl.ParentID != "" {
 		return "", 404, "unknown_slot", "unknown slot"
+	}
+	var members []showMember
+	if sl.MediaKind == "group" {
+		kids := s.childSlots(id)
+		for _, c := range kids {
+			if !c.Enabled {
+				continue
+			}
+			members = append(members, memberPayload(c, vars))
+		}
+		if len(members) == 0 {
+			return "", 400, "empty_slot", "empty slot"
+		}
 	}
 	text = renderTemplate(sl.TextTemplate, vars)
 	s.mu.Lock()
@@ -72,36 +109,92 @@ func (s *Server) fire(id string, vars map[string]string, durOverride *int) (text
 	if eff != nil && *eff <= 0 {
 		eff = nil
 	}
-	s.live[id] = liveSlot{
+	wait := waitEnded(sl, members, eff)
+	sticky := eff == nil && !wait
+	lv := liveSlot{
 		Seq: seq, Text: text, MediaKind: sl.MediaKind, MediaPath: sl.MediaPath,
-		Playback: sl.Playback, Volume: sl.Volume, Duration: eff,
+		Playback: sl.Playback, Volume: sl.Volume, Theme: sl.Theme, Duration: eff,
+		Members: members, WaitEnded: wait,
 	}
+	s.live[id] = lv
 	if t, ok := s.timers[id]; ok {
 		t.Stop()
 		delete(s.timers, id)
 	}
-	sticky := eff == nil
+	visText := text
+	if sl.MediaKind == "group" {
+		b, _ := json.Marshal(members)
+		visText = string(b)
+	}
 	if sticky {
 		_, _ = s.db.Exec(`INSERT INTO visible(slot_id,seq,text,media_kind,media_path) VALUES(?,?,?,?,?)
 			ON CONFLICT(slot_id) DO UPDATE SET seq=excluded.seq,text=excluded.text,media_kind=excluded.media_kind,media_path=excluded.media_path`,
-			id, seq, text, sl.MediaKind, sl.MediaPath)
+			id, seq, visText, sl.MediaKind, sl.MediaPath)
 	} else {
 		_, _ = s.db.Exec(`DELETE FROM visible WHERE slot_id=?`, id)
-		ms := *eff
-		s.timers[id] = time.AfterFunc(time.Duration(ms)*time.Millisecond, func() {
-			s.hide(id, "duration")
-		})
+		if eff != nil {
+			ms := *eff
+			s.timers[id] = time.AfterFunc(time.Duration(ms)*time.Millisecond, func() {
+				s.hide(id, "duration")
+			})
+		}
 	}
-	show := map[string]any{
-		"type": "show", "slot": id, "seq": seq,
-		"media_kind": sl.MediaKind, "media_url": mediaURL(sl),
-		"playback": sl.Playback, "volume": sl.Volume, "text": text,
-		"duration_ms": jsonDur(eff),
-	}
+	show := showMap(id, sl, lv)
 	s.mu.Unlock()
 	s.logEvent("show", id, "", "ok")
 	s.hub.broadcast(show)
 	return text, 200, "", ""
+}
+
+func memberPayload(c Slot, vars map[string]string) showMember {
+	th := c.Theme
+	if th == "" {
+		th = "plain"
+	}
+	return showMember{
+		ID: c.ID, MediaKind: c.MediaKind, MediaURL: mediaURL(c),
+		Playback: c.Playback, Volume: c.Volume, Text: renderTemplate(c.TextTemplate, vars),
+		Theme: th, X: c.X, Y: c.Y, W: c.W, H: c.H, Z: c.Z,
+	}
+}
+
+func showMap(id string, sl Slot, lv liveSlot) map[string]any {
+	m := map[string]any{
+		"type": "show", "slot": id, "seq": lv.Seq,
+		"media_kind": sl.MediaKind, "media_url": mediaURL(sl),
+		"playback": sl.Playback, "volume": sl.Volume, "text": lv.Text,
+		"theme": sl.Theme, "duration_ms": jsonDur(lv.Duration),
+	}
+	if sl.MediaKind == "group" {
+		m["members"] = lv.Members
+		m["media_url"] = ""
+		m["text"] = ""
+	}
+	return m
+}
+
+func waitEnded(sl Slot, members []showMember, eff *int) bool {
+	if eff != nil {
+		return false
+	}
+	if sl.MediaKind == "video" || sl.MediaKind == "audio" {
+		return sl.Playback != "loop"
+	}
+	if sl.MediaKind != "group" {
+		return false
+	}
+	hasOnce, hasLoop := false, false
+	for _, c := range members {
+		if c.MediaKind != "video" && c.MediaKind != "audio" {
+			continue
+		}
+		if c.Playback == "loop" {
+			hasLoop = true
+		} else {
+			hasOnce = true
+		}
+	}
+	return hasOnce && !hasLoop
 }
 
 func (s *Server) hide(id string, reason string) {
@@ -137,15 +230,16 @@ func (s *Server) hideAll() {
 func (s *Server) ended(slot string, seq int) {
 	s.mu.Lock()
 	lv, ok := s.live[slot]
+	wait := ok && lv.WaitEnded && lv.Seq == seq
 	s.mu.Unlock()
-	if !ok || lv.Seq != seq {
+	if !wait {
 		return
 	}
 	s.hide(slot, "ended")
 }
 
 func mediaURL(sl Slot) string {
-	if sl.MediaKind == "none" || sl.MediaPath == "" {
+	if sl.MediaKind == "text" || sl.MediaKind == "group" || sl.MediaPath == "" {
 		return ""
 	}
 	return "/media/" + sl.MediaPath
@@ -174,7 +268,7 @@ func validSlot(sl Slot) (errKey, msg string) {
 		return "reserved_id", "reserved id"
 	}
 	switch sl.MediaKind {
-	case "none", "image", "gif", "video", "audio":
+	case "text", "image", "gif", "video", "audio", "group":
 	default:
 		return "invalid_slot", "invalid media_kind"
 	}
@@ -184,12 +278,24 @@ func validSlot(sl Slot) (errKey, msg string) {
 	if sl.Playback != "once" && sl.Playback != "loop" {
 		return "invalid_slot", "invalid playback"
 	}
-	if sl.CSSClass != "" && !cssClassRe.MatchString(sl.CSSClass) {
-		return "invalid_slot", "invalid css_class"
+	if sl.Theme == "" {
+		sl.Theme = "plain"
 	}
-	hasMedia := sl.MediaKind != "none" && sl.MediaPath != ""
-	if !hasMedia && sl.TextTemplate == "" {
-		return "empty_slot", "empty slot"
+	if !themes[sl.Theme] {
+		return "invalid_slot", "invalid theme"
+	}
+	if sl.MediaKind == "group" && sl.ParentID != "" {
+		return "invalid_slot", "nested group"
+	}
+	switch sl.MediaKind {
+	case "text":
+		if sl.TextTemplate == "" {
+			return "empty_slot", "empty slot"
+		}
+	case "image", "gif", "video", "audio":
+		if sl.MediaPath == "" {
+			return "empty_slot", "empty slot"
+		}
 	}
 	return "", ""
 }

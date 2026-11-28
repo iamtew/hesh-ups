@@ -50,13 +50,39 @@
     };
   }
 
+  function effects() {
+    return (window.SeshThemes && window.SeshThemes.effects) || {};
+  }
+
+  function stopThemes(root) {
+    var fx = effects();
+    root.querySelectorAll(".theme-panel").forEach(function (p) {
+      Object.keys(fx).forEach(function (id) {
+        if (fx[id] && fx[id].stop) fx[id].stop(p);
+      });
+    });
+  }
+
+  function startTheme(popup) {
+    var id = popup.getAttribute("data-theme");
+    var panel = popup.querySelector(".theme-panel");
+    var fx = effects();
+    if (panel && id && fx[id] && fx[id].start) fx[id].start(panel);
+  }
+
+  function sendEnded(slot, seq) {
+    if (ws && ws.readyState === 1) {
+      ws.send(JSON.stringify({ type: "ended", slot: slot, seq: seq }));
+    }
+  }
+
   function place(id) {
     var n = nodes[id];
     var meta = slots[id];
     if (!n || !meta) return;
     var on = n.classList.contains("is-on");
-    n.className = "slot" + (meta.css_class ? " " + meta.css_class : "");
-    if (on) n.classList.add("is-on");
+    n.className = "slot popup" + (on ? " is-on" : "");
+    n.setAttribute("data-kind", meta.media_kind || "");
     n.style.left = (meta.x || 0) + "px";
     n.style.top = (meta.y || 0) + "px";
     n.style.width = (meta.w || 100) + "px";
@@ -68,7 +94,7 @@
     var n = nodes[id];
     if (!n) {
       n = document.createElement("div");
-      n.className = "slot";
+      n.className = "slot popup";
       canvas.appendChild(n);
       nodes[id] = n;
     }
@@ -76,45 +102,80 @@
     return n;
   }
 
+  function fillKind(host, msg, ended) {
+    var kind = msg.media_kind;
+    var vol = (msg.volume != null ? msg.volume : 100) / 100;
+    if (kind === "image" || kind === "gif") {
+      var img = document.createElement("img");
+      img.src = (msg.media_url || "") + (msg.seq != null ? "?s=" + msg.seq : "");
+      host.appendChild(img);
+      return;
+    }
+    if (kind === "video" || kind === "audio") {
+      var el = document.createElement(kind);
+      el.autoplay = true;
+      el.src = (msg.media_url || "") + (msg.seq != null ? "?s=" + msg.seq : "");
+      el.volume = vol;
+      if (msg.playback === "loop") el.loop = true;
+      if (msg.playback !== "loop" && ended) {
+        el.addEventListener("ended", ended);
+      }
+      host.appendChild(el);
+      return;
+    }
+    if (kind === "text") {
+      var theme = msg.theme || "plain";
+      host.setAttribute("data-theme", theme);
+      var wrap = document.createElement("div");
+      wrap.className = "banner-content" + (theme === "plain" ? "" : " theme-panel");
+      var t = document.createElement("div");
+      t.className = "banner-text";
+      t.innerHTML = msg.text || "";
+      wrap.appendChild(t);
+      host.appendChild(wrap);
+      startTheme(host);
+    }
+  }
+
   function show(msg) {
     var id = msg.id || msg.slot;
     var n = nodeFor(id);
+    stopThemes(n);
     n.innerHTML = "";
-    var vol = (msg.volume != null ? msg.volume : 100) / 100;
-    if (msg.media_kind === "image" || msg.media_kind === "gif") {
-      var img = document.createElement("img");
-      img.src = msg.media_url + "?s=" + msg.seq;
-      n.appendChild(img);
-    } else if (msg.media_kind === "video") {
-      var v = document.createElement("video");
-      v.autoplay = true;
-      v.src = msg.media_url + "?s=" + msg.seq;
-      v.volume = vol;
-      if (msg.playback === "loop") v.loop = true;
-      v.addEventListener("ended", function () {
-        if (msg.playback === "once" && ws && ws.readyState === 1) {
-          ws.send(JSON.stringify({ type: "ended", slot: id, seq: msg.seq }));
-        }
+    n.removeAttribute("data-theme");
+    var kind = msg.media_kind;
+    n.setAttribute("data-kind", kind || "");
+    if (kind === "group") {
+      var once = 0;
+      (msg.members || []).forEach(function (m) {
+        if ((m.media_kind === "video" || m.media_kind === "audio") && m.playback !== "loop") once++;
       });
-      n.appendChild(v);
-    } else if (msg.media_kind === "audio") {
-      var a = document.createElement("audio");
-      a.autoplay = true;
-      a.src = msg.media_url + "?s=" + msg.seq;
-      a.volume = vol;
-      if (msg.playback === "loop") a.loop = true;
-      a.addEventListener("ended", function () {
-        if (msg.playback === "once" && ws && ws.readyState === 1) {
-          ws.send(JSON.stringify({ type: "ended", slot: id, seq: msg.seq }));
+      var left = { n: once };
+      (msg.members || []).forEach(function (m) {
+        var child = document.createElement("div");
+        child.className = "popup member";
+        child.setAttribute("data-kind", m.media_kind || "");
+        child.style.left = (m.x || 0) + "px";
+        child.style.top = (m.y || 0) + "px";
+        child.style.width = (m.w || 32) + "px";
+        child.style.height = (m.h || 32) + "px";
+        child.style.zIndex = String(m.z || 0);
+        var ended = null;
+        if ((m.media_kind === "video" || m.media_kind === "audio") && m.playback !== "loop") {
+          ended = function () {
+            left.n--;
+            if (left.n <= 0) sendEnded(id, msg.seq);
+          };
         }
+        fillKind(child, m, ended);
+        n.appendChild(child);
       });
-      n.appendChild(a);
-    }
-    if (msg.text) {
-      var t = document.createElement("div");
-      t.className = "text";
-      t.innerHTML = msg.text;
-      n.appendChild(t);
+    } else {
+      var ended = null;
+      if ((kind === "video" || kind === "audio") && msg.playback !== "loop") {
+        ended = function () { sendEnded(id, msg.seq); };
+      }
+      fillKind(n, msg, ended);
     }
     n.classList.add("is-on");
   }
@@ -123,11 +184,13 @@
     var n = nodes[id];
     if (!n) return;
     n.classList.remove("is-on");
+    stopThemes(n);
     n.querySelectorAll("video, audio").forEach(function (el) {
       el.pause();
       el.removeAttribute("src");
       el.load();
     });
+    n.innerHTML = "";
   }
 
   setInterval(function () {

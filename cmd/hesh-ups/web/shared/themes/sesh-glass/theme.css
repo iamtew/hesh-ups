@@ -1,0 +1,105 @@
+/* Sesh Glass — reusable overlay theme
+   Host: set data-theme="sesh-glass" on <html> and class="theme-panel" on the glass surface.
+   Pulse + Pixi fill: themes/sesh-glass/theme.js (needs vendored PixiJS). */
+
+.popup[data-theme="sesh-glass"] {
+  --sesh-text-primary: #fff6e8;
+  --sesh-text-base: #eee;
+
+  --sesh-glass-grad-a: rgba(242, 13, 13, 0.88);
+  --sesh-glass-grad-b: rgba(255, 77, 0, 0.72);
+  --sesh-glass-grad-c: rgba(255, 170, 0, 0.48);
+  --sesh-glass-grad-d: rgba(229, 242, 13, 0.22);
+  --sesh-glass-border: rgba(255, 230, 90, 0.32);
+  --sesh-glass-inset-highlight: rgba(255, 255, 255, 0.18);
+  --sesh-glass-shadow: rgba(0, 0, 0, 0.25);
+  --sesh-outline-opacity: 0.6;
+  --sesh-outline-inner: rgba(0, 0, 0, var(--sesh-outline-opacity));
+  --sesh-outline-outer: rgba(255, 255, 255, var(--sesh-outline-opacity));
+  --sesh-outline-width: 0.25rem;
+
+  --sesh-blur-amount: 12px;
+  --sesh-saturate-amount: 120%;
+  --sesh-radius-panel: 16px;
+
+  --sesh-aberration-primary: rgba(242, 13, 13, 0.6);
+  --sesh-aberration-soft: rgba(242, 13, 13, 0.35);
+
+  --theme-text-shadow:
+    0 0 6px var(--sesh-aberration-primary),
+    0 0 12px var(--sesh-aberration-soft);
+
+  /* Host apps that already use --banner-* tokens pick these up without extra CSS */
+  --banner-bg: linear-gradient(
+    to top,
+    var(--sesh-glass-grad-a) 0%,
+    var(--sesh-glass-grad-b) 14%,
+    var(--sesh-glass-grad-c) 40%,
+    var(--sesh-glass-grad-d) 100%
+  );
+  --banner-border: var(--sesh-glass-border);
+  --banner-text: var(--sesh-text-primary);
+  --banner-shadow:
+    inset 0 1px 0 var(--sesh-glass-inset-highlight),
+    0 10px 30px var(--sesh-glass-shadow),
+    0 0 0 var(--sesh-outline-width) var(--sesh-outline-inner),
+    0 0 0 calc(var(--sesh-outline-width) * 2) var(--sesh-outline-outer);
+  --banner-blur: var(--sesh-blur-amount);
+  --banner-saturate: var(--sesh-saturate-amount);
+  --banner-radius-base: var(--sesh-radius-panel);
+  --banner-accent: var(--sesh-text-primary);
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--sesh-text-primary);
+  /* CSS gradient is the fallback if Pixi never boots */
+  background: linear-gradient(
+    to top,
+    var(--sesh-glass-grad-a) 0%,
+    var(--sesh-glass-grad-b) 14%,
+    var(--sesh-glass-grad-c) 40%,
+    var(--sesh-glass-grad-d) 100%
+  );
+  border: 1px solid var(--sesh-glass-border);
+  border-radius: var(--banner-radius, var(--sesh-radius-panel));
+  box-shadow:
+    inset 0 1px 0 var(--sesh-glass-inset-highlight),
+    0 10px 30px var(--sesh-glass-shadow),
+    0 0 0 var(--sesh-outline-width) var(--sesh-outline-inner),
+    0 0 0 calc(var(--sesh-outline-width) * 2) var(--sesh-outline-outer);
+  backdrop-filter: blur(var(--sesh-blur-amount)) saturate(var(--sesh-saturate-amount));
+  -webkit-backdrop-filter: blur(var(--sesh-blur-amount)) saturate(var(--sesh-saturate-amount));
+  text-shadow: var(--theme-text-shadow);
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel .sesh-glass-pixi {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel > * {
+  position: relative;
+  z-index: 2;
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel > .sesh-glass-pixi {
+  position: absolute;
+  z-index: 0;
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel * {
+  text-shadow: var(--theme-text-shadow);
+}
+
+.popup[data-theme="sesh-glass"] .theme-panel .sesh-glass-pixi {
+  text-shadow: none;
+}

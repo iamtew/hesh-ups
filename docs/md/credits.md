@@ -10,6 +10,10 @@ Outline subset only (not the full set). Sprite: [vendor/tabler/icons.svg](../ven
 
 `layers` is not in this pin; overlay/layers chrome uses `stack-2`.
 
+## PixiJS
+
+[PixiJS](https://pixijs.com/) v8.8.1, MIT. Copyright (c) 2013-2023 Mathew Groves, Chad Engler. Vendored at `cmd/hesh-ups/web/shared/vendor/pixi/` (`pixi.min.js`, `LICENSE`) for overlay/composer text-banner effects. No CDN.
+
 ## marked
 
 [marked](https://github.com/markedjs/marked) v18.1.2, MIT. [vendor/marked.min.js](../vendor/marked.min.js) powers the Pages viewer.

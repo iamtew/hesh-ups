@@ -1,0 +1,55 @@
+/* Text popup shell. Theme CSS remaps --banner-* on .popup[data-theme]. */
+.popup {
+  --banner-bg: rgba(12, 16, 28, 0.55);
+  --banner-border: rgba(255, 255, 255, 0.18);
+  --banner-text: #fff;
+  --banner-shadow: 0 4px 24px rgba(0, 0, 0, 0.35);
+  --banner-blur: 10px;
+  --banner-saturate: 100%;
+  --banner-radius: 16px;
+  --banner-pad-top: 1.25rem;
+  --banner-pad-right: 1.75rem;
+  --banner-pad-bottom: 1.25rem;
+  --banner-pad-left: 1.75rem;
+}
+
+.popup .banner-content {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: var(--banner-pad-top) var(--banner-pad-right) var(--banner-pad-bottom) var(--banner-pad-left);
+  border-radius: var(--banner-radius);
+  border: 1px solid var(--banner-border);
+  background: var(--banner-bg);
+  backdrop-filter: blur(var(--banner-blur)) saturate(var(--banner-saturate));
+  -webkit-backdrop-filter: blur(var(--banner-blur)) saturate(var(--banner-saturate));
+  box-shadow: var(--banner-shadow);
+  color: var(--banner-text);
+  overflow: hidden;
+}
+
+.popup .banner-text {
+  width: 100%;
+  color: inherit;
+  font: 600 24px/1.2 system-ui, sans-serif;
+  text-align: center;
+  word-wrap: break-word;
+}
+
+.popup[data-theme="plain"] .banner-content {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 0.25em 0.4em;
+}
+
+.popup[data-theme="plain"] .banner-text {
+  color: #fff;
+  -webkit-text-stroke: 3px #111;
+  paint-order: stroke fill;
+}

@@ -26,11 +26,52 @@
     });
   }
 
+  var THEMES = [
+    { id: "plain", name: "Plain" },
+    { id: "lcd-glass", name: "LCD Glass" },
+    { id: "sesh-glass", name: "Sesh Glass" },
+    { id: "sesh-glass-old", name: "Sesh Glass Old" },
+    { id: "3026-d3c0", name: "3026 D3C0" },
+  ];
+
   function kindIcon(s) {
+    if (s.media_kind === "group") return "stack-2";
     if (s.media_kind === "image" || s.media_kind === "gif") return "photo";
     if (s.media_kind === "video") return "movie";
     if (s.media_kind === "audio") return "volume";
     return "letter-t";
+  }
+
+  function fireId(s) {
+    return s.parent_id || s.id;
+  }
+
+  function absRect(s) {
+    if (!s.parent_id) return { x: s.x, y: s.y, w: s.w, h: s.h };
+    var p = slotById(s.parent_id);
+    if (!p) return { x: s.x, y: s.y, w: s.w, h: s.h };
+    return { x: p.x + s.x, y: p.y + s.y, w: s.w, h: s.h };
+  }
+
+  function boundsFor(s) {
+    if (s.parent_id) {
+      var p = slotById(s.parent_id);
+      if (p) return { w: p.w, h: p.h };
+    }
+    return { w: state.canvas.w, h: state.canvas.h };
+  }
+
+  function themeFx() {
+    return (window.SeshThemes && window.SeshThemes.effects) || {};
+  }
+
+  function stopThemes(root) {
+    var fx = themeFx();
+    root.querySelectorAll(".theme-panel").forEach(function (p) {
+      Object.keys(fx).forEach(function (id) {
+        if (fx[id] && fx[id].stop) fx[id].stop(p);
+      });
+    });
   }
 
   function origin() {
@@ -228,8 +269,9 @@
     }
     state.slots.forEach(function (s) {
       if (s.id === sel) return;
-      if (horizontal) g.push(s.x, s.x + s.w, s.x + s.w / 2);
-      else g.push(s.y, s.y + s.h, s.y + s.h / 2);
+      var r = absRect(s);
+      if (horizontal) g.push(r.x, r.x + r.w, r.x + r.w / 2);
+      else g.push(r.y, r.y + r.h, r.y + r.h / 2);
     });
     return g;
   }
@@ -253,11 +295,17 @@
   }
 
   function placeBox(el, s) {
-    el.style.left = (s.x / state.canvas.w * 100) + "%";
-    el.style.top = (s.y / state.canvas.h * 100) + "%";
-    el.style.width = (s.w / state.canvas.w * 100) + "%";
-    el.style.height = (s.h / state.canvas.h * 100) + "%";
-    el.style.zIndex = String(s.z || 0);
+    var r = absRect(s);
+    el.style.left = (r.x / state.canvas.w * 100) + "%";
+    el.style.top = (r.y / state.canvas.h * 100) + "%";
+    el.style.width = (r.w / state.canvas.w * 100) + "%";
+    el.style.height = (r.h / state.canvas.h * 100) + "%";
+    var z = s.z || 0;
+    if (s.parent_id) {
+      var p = slotById(s.parent_id);
+      z = ((p && p.z) || 0) * 100 + z + 1;
+    }
+    el.style.zIndex = String(z);
   }
 
   function previewText(tmpl) {
@@ -268,9 +316,10 @@
   }
 
   function fillBox(el, s) {
-    el.className = "box" + (s.id === sel ? " sel" : "") + (s.visible ? " live" : "");
-    if (s.css_class) el.className += " " + s.css_class;
-    el.querySelectorAll("img, video, .text").forEach(function (n) { n.remove(); });
+    stopThemes(el);
+    var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
+    el.className = "box popup" + (s.id === sel ? " sel" : "") + (live ? " live" : "") + (s.parent_id ? " child" : "");
+    el.querySelectorAll("img, video, .banner-content").forEach(function (n) { n.remove(); });
     var before = el.querySelector(".handle");
     function add(node) {
       if (before) el.insertBefore(node, before);
@@ -287,12 +336,18 @@
       v.src = "/media/" + s.media_path;
       if (s.playback === "loop") v.loop = true;
       add(v);
-    }
-    if (s.text_template) {
+    } else if (s.media_kind === "text") {
+      var theme = s.theme || "plain";
+      el.setAttribute("data-theme", theme);
+      var wrap = document.createElement("div");
+      wrap.className = "banner-content" + (theme === "plain" ? "" : " theme-panel");
       var t = document.createElement("div");
-      t.className = "text";
+      t.className = "banner-text";
       t.innerHTML = previewText(s.text_template);
-      add(t);
+      wrap.appendChild(t);
+      add(wrap);
+      var fx = themeFx();
+      if (theme !== "plain" && fx[theme] && fx[theme].start) fx[theme].start(wrap);
     }
   }
 
@@ -303,8 +358,11 @@
     var h = Math.max(32, +document.getElementById("f-h").value || 0);
     var x = +document.getElementById("f-x").value || 0;
     var y = +document.getElementById("f-y").value || 0;
-    x = Math.max(0, Math.min(state.canvas.w - w, x));
-    y = Math.max(0, Math.min(state.canvas.h - h, y));
+    var lim = boundsFor(s);
+    w = Math.max(32, Math.min(w, lim.w));
+    h = Math.max(32, Math.min(h, lim.h));
+    x = Math.max(0, Math.min(lim.w - w, x));
+    y = Math.max(0, Math.min(lim.h - h, y));
     s.x = Math.round(x);
     s.y = Math.round(y);
     s.w = Math.round(w);
@@ -313,22 +371,12 @@
     s.label = document.getElementById("f-label").value;
     var ft = document.getElementById("f-text");
     if (ft) s.text_template = ft.value;
+    var fth = document.getElementById("f-theme");
+    if (fth) s.theme = fth.value;
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
     if (el) {
       placeBox(el, s);
-      var t = el.querySelector(".text");
-      if (s.text_template) {
-        if (!t) {
-          t = document.createElement("div");
-          t.className = "text";
-          var hd = el.querySelector(".handle");
-          if (hd) el.insertBefore(t, hd);
-          else el.appendChild(t);
-        }
-        t.innerHTML = previewText(s.text_template);
-      } else if (t) {
-        t.remove();
-      }
+      if (s.media_kind === "text") fillBox(el, s);
     }
     var li = list.querySelector('li[data-id="' + s.id + '"]');
     if (li) {
@@ -345,13 +393,13 @@
     hint.style.display = state.slots.length ? "none" : "block";
     stage.style.setProperty("--canvas-h", String(state.canvas.h));
     paintGrid();
-    var ordered = state.slots.slice().sort(function (a, b) { return b.z - a.z; });
-    list.innerHTML = "";
-    ordered.forEach(function (s) {
+    function layerRow(s, child) {
       var li = document.createElement("li");
       if (s.id === sel) li.className = "sel";
+      if (child) li.className = (li.className ? li.className + " " : "") + "child";
       li.dataset.id = s.id;
-      if (s.visible) li.className = (li.className ? li.className + " " : "") + "live";
+      var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
+      if (live) li.className = (li.className ? li.className + " " : "") + "live";
       li.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
       li.querySelector("span").textContent = s.label || s.id;
       li.addEventListener("click", function (e) {
@@ -360,6 +408,16 @@
         render();
       });
       list.appendChild(li);
+    }
+    var ordered = state.slots.filter(function (s) { return !s.parent_id; }).sort(function (a, b) { return b.z - a.z; });
+    list.innerHTML = "";
+    ordered.forEach(function (s) {
+      layerRow(s, false);
+      if (s.media_kind === "group") {
+        state.slots.filter(function (c) { return c.parent_id === s.id; }).sort(function (a, b) { return b.z - a.z; }).forEach(function (c) {
+          layerRow(c, true);
+        });
+      }
     });
     boxes.innerHTML = "";
     state.slots.forEach(function (s) {
@@ -386,52 +444,92 @@
       inspector.innerHTML = '<p class="muted">Select a slot</p>';
       return;
     }
-    inspector.innerHTML =
+    var kind = s.media_kind || "text";
+    var child = !!s.parent_id;
+    var html =
       '<label>id <input id="f-id" value="' + esc(s.id) + '"></label>' +
       '<label>label <input id="f-label" value="' + esc(s.label || "") + '"></label>' +
       '<label>x <input id="f-x" type="number" value="' + s.x + '"></label>' +
       '<label>y <input id="f-y" type="number" value="' + s.y + '"></label>' +
       '<label>w <input id="f-w" type="number" value="' + s.w + '"></label>' +
       '<label>h <input id="f-h" type="number" value="' + s.h + '"></label>' +
-      '<label>z <input id="f-z" type="number" value="' + s.z + '"></label>' +
-      '<label>media_kind <select id="f-kind"><option>none</option><option>image</option><option>gif</option><option>video</option><option>audio</option></select></label>' +
-      '<label>file <input id="f-file" type="file"></label>' +
-      '<label>existing <select id="f-media"></select></label>' +
-      '<label>text_template <textarea id="f-text">' + esc(s.text_template || "") + "</textarea></label>" +
-      '<label>playback <select id="f-play"><option>once</option><option>loop</option></select></label>' +
-      '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>' +
-      '<p class="muted">Blank duration stays on until Hide. Default for new slots is 5000.</p>' +
-      '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>' +
-      '<label>css_class <input id="f-css" value="' + esc(s.css_class || "") + '"></label>' +
-      '<p><button type="button" id="f-save">' + icon("device-floppy") + ' Save</button> ' +
-      '<button type="button" id="f-test">' + icon("player-play") + ' Test</button> ' +
-      '<button type="button" id="f-hide">' + icon("eye-off") + ' Hide</button> ' +
-      '<button type="button" id="f-copy">' + icon("link") + ' Copy trigger URL</button> ' +
-      '<button type="button" id="f-del">' + icon("trash") + ' Trash</button></p>';
-    document.getElementById("f-kind").value = s.media_kind;
-    document.getElementById("f-play").value = s.playback;
-    fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
-      var selEl = document.getElementById("f-media");
-      if (!selEl) return;
-      selEl.innerHTML = '<option value="">(pick)</option>';
-      (m.files || []).forEach(function (f) {
-        var o = document.createElement("option");
-        o.value = f.path;
-        o.dataset.kind = f.kind || "";
-        o.textContent = f.path;
-        if (f.path === s.media_path) o.selected = true;
-        selEl.appendChild(o);
+      '<label>z <input id="f-z" type="number" value="' + s.z + '"></label>';
+    if (!child) {
+      html += '<label>type <select id="f-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option><option value="group">group</option></select></label>';
+    } else {
+      html += '<p class="muted">Member of ' + esc(s.parent_id) + '</p>';
+      html += '<label>type <select id="f-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option></select></label>';
+    }
+    if (kind === "text") {
+      html += '<label>text_template <textarea id="f-text">' + esc(s.text_template || "") + "</textarea></label>";
+      html += '<label>theme <select id="f-theme">';
+      THEMES.forEach(function (th) {
+        html += '<option value="' + th.id + '"' + ((s.theme || "plain") === th.id ? " selected" : "") + ">" + th.name + "</option>";
       });
-    });
+      html += "</select></label>";
+    }
+    if (kind === "image" || kind === "gif" || kind === "video" || kind === "audio") {
+      html += '<label>file <input id="f-file" type="file"></label>';
+      html += '<label>existing <select id="f-media"></select></label>';
+    }
+    if (kind === "video" || kind === "audio") {
+      html += '<label>playback <select id="f-play"><option>once</option><option>loop</option></select></label>';
+      html += '<label>volume <input id="f-vol" type="number" min="0" max="100" value="' + s.volume + '"></label>';
+    }
+    if (!child) {
+      html += '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>';
+      html += '<p class="muted">Blank duration stays on until Hide. Default for new slots is 5000.</p>';
+    }
+    if (kind === "group") {
+      html += '<p class="muted">Members</p><ul id="f-members">';
+      state.slots.filter(function (c) { return c.parent_id === s.id; }).forEach(function (c) {
+        html += "<li>" + esc(c.label || c.id) + " (" + esc(c.media_kind) + ")</li>";
+      });
+      html += '</ul><label>add member <select id="f-add-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option></select></label>';
+      html += '<p><button type="button" id="f-add-member">' + icon("plus") + " Add member</button></p>";
+    }
+    html += '<p><button type="button" id="f-save">' + icon("device-floppy") + " Save</button> " +
+      '<button type="button" id="f-test">' + icon("player-play") + " Test</button> " +
+      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button> ";
+    if (!child) html += '<button type="button" id="f-copy">' + icon("link") + " Copy trigger URL</button> ";
+    html += '<button type="button" id="f-del">' + icon("trash") + " Trash</button></p>";
+    inspector.innerHTML = html;
+    document.getElementById("f-kind").value = kind;
+    var play = document.getElementById("f-play");
+    if (play) play.value = s.playback || "once";
+    var mediaSel = document.getElementById("f-media");
+    if (mediaSel) {
+      fetch("/api/media").then(function (r) { return r.json(); }).then(function (m) {
+        var selEl = document.getElementById("f-media");
+        if (!selEl) return;
+        selEl.innerHTML = '<option value="">(pick)</option>';
+        (m.files || []).forEach(function (f) {
+          if (f.kind && f.kind !== kind) return;
+          var o = document.createElement("option");
+          o.value = f.path;
+          o.dataset.kind = f.kind || "";
+          o.textContent = f.path;
+          if (f.path === s.media_path) o.selected = true;
+          selEl.appendChild(o);
+        });
+      });
+    }
+  }
+
+  function val(id, fallback) {
+    var el = document.getElementById(id);
+    if (!el) return fallback;
+    return el.value;
   }
 
   function readForm(s) {
-    var dur = document.getElementById("f-dur").value;
+    var durEl = document.getElementById("f-dur");
     var nid = document.getElementById("f-id").value.trim();
     if (nid !== s.id) {
       if (!confirm("Changing id creates a new slot; the old URL will 404. Continue?")) return null;
     }
-    return {
+    var kind = val("f-kind", s.media_kind);
+    var body = {
       id: nid,
       label: document.getElementById("f-label").value,
       x: +document.getElementById("f-x").value,
@@ -439,15 +537,21 @@
       w: +document.getElementById("f-w").value,
       h: +document.getElementById("f-h").value,
       z: +document.getElementById("f-z").value,
-      media_kind: document.getElementById("f-kind").value,
-      media_path: document.getElementById("f-media").value || s.media_path || "",
-      text_template: document.getElementById("f-text").value,
-      playback: document.getElementById("f-play").value,
-      duration_ms: dur === "" ? null : +dur,
-      volume: +document.getElementById("f-vol").value,
-      css_class: document.getElementById("f-css").value,
+      media_kind: kind,
+      media_path: val("f-media", s.media_path || "") || s.media_path || "",
+      text_template: val("f-text", s.text_template || ""),
+      playback: val("f-play", s.playback || "once"),
+      duration_ms: durEl ? (durEl.value === "" ? null : +durEl.value) : s.duration_ms,
+      volume: document.getElementById("f-vol") ? +document.getElementById("f-vol").value : s.volume,
+      theme: val("f-theme", s.theme || "plain"),
+      parent_id: s.parent_id || "",
       enabled: s.enabled,
     };
+    if (kind !== "text") body.theme = "plain";
+    if (kind !== "text") body.text_template = kind === "group" ? "" : body.text_template;
+    if (kind === "text" || kind === "group") body.media_path = "";
+    if (kind === "group") body.text_template = "";
+    return body;
   }
 
   function showSettingsPage(name) {
@@ -526,23 +630,43 @@
       var fired = readForm(s);
       if (!fired) return;
       persist(s, fired).then(function () {
-        return fetch(popupURL(fired.id, "user=Ada"), { method: "POST" });
+        return fetch(popupURL(fireId(fired), "user=Ada"), { method: "POST" });
       }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
-        var sticky = (fired.duration_ms == null || fired.duration_ms <= 0) && fired.media_kind !== "video" && fired.media_kind !== "audio";
-        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fired.id);
+        var sticky = (fired.duration_ms == null || fired.duration_ms <= 0) && fired.media_kind !== "video" && fired.media_kind !== "audio" && fired.media_kind !== "group";
+        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fireId(fired));
       }).catch(function (err) {
         if (!err || !err.save) setStatus("Fire failed");
       });
     }
     if (id === "f-hide") {
-      fetch(origin() + "/api/popup/" + encodeURIComponent(s.id) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
-        if (r.ok) setStatus("Hidden " + s.id);
+      fetch(origin() + "/api/popup/" + encodeURIComponent(fireId(s)) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
+        if (r.ok) setStatus("Hidden " + fireId(s));
         else errMsg(r).then(setStatus);
       }).catch(function () { setStatus("Hide failed"); });
     }
     if (id === "f-copy") {
-      copyText(popupURL(s.id)).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
+      copyText(popupURL(fireId(s))).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
+    }
+    if (id === "f-add-member") {
+      var kind = (document.getElementById("f-add-kind") || {}).value || "text";
+      var n = 1;
+      while (slotById(s.id + "-" + n)) n++;
+      var cid = s.id + "-" + n;
+      fetch("/api/slots/" + cid, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: cid, label: kind, x: 16, y: 16, w: 160, h: 80, z: n,
+          media_kind: kind, media_path: "", text_template: kind === "text" ? "New slot" : "",
+          playback: "once", duration_ms: null, volume: 100, enabled: true,
+          parent_id: s.id, theme: "plain",
+        }),
+      }).then(function (r) {
+        if (!r.ok) return errMsg(r).then(setStatus);
+        sel = cid;
+        return load();
+      });
     }
     if (id === "f-del") {
       fetch("/api/slots/" + encodeURIComponent(s.id), { method: "DELETE" }).then(function () { sel = null; return load(); });
@@ -550,7 +674,7 @@
   });
   inspector.addEventListener("input", function (e) {
     var id = e.target.id;
-    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label" || id === "f-text") {
+    if (id === "f-x" || id === "f-y" || id === "f-w" || id === "f-h" || id === "f-z" || id === "f-label" || id === "f-text" || id === "f-theme") {
       applyInspectorPreview();
     }
   });
@@ -577,19 +701,25 @@
       return;
     }
     if (e.target.id === "f-id") return;
-    var persist = { "f-x": 1, "f-y": 1, "f-w": 1, "f-h": 1, "f-z": 1, "f-label": 1, "f-kind": 1, "f-text": 1, "f-play": 1, "f-dur": 1, "f-vol": 1, "f-css": 1 };
-    if (!persist[e.target.id]) return;
+    var persistIds = { "f-x": 1, "f-y": 1, "f-w": 1, "f-h": 1, "f-z": 1, "f-label": 1, "f-kind": 1, "f-text": 1, "f-play": 1, "f-dur": 1, "f-vol": 1, "f-theme": 1 };
+    if (!persistIds[e.target.id]) return;
     var s = slotById(sel);
     if (!s) return;
+    var body = readForm(s);
+    if (!body) return;
+    if (e.target.id === "f-kind") {
+      if (body.media_kind === "text" && !body.text_template) body.text_template = "New slot";
+      if (body.media_kind !== "text") body.text_template = "";
+      if (body.media_kind === "text" || body.media_kind === "group") body.media_path = "";
+      var needsFile = body.media_kind === "image" || body.media_kind === "gif" || body.media_kind === "video" || body.media_kind === "audio";
+      if (needsFile && !body.media_path) {
+        s.media_kind = body.media_kind;
+        paintInspector();
+        return;
+      }
+    }
     applyInspectorPreview();
-    s.media_kind = document.getElementById("f-kind").value;
-    s.text_template = document.getElementById("f-text").value;
-    s.playback = document.getElementById("f-play").value;
-    var dur = document.getElementById("f-dur").value;
-    s.duration_ms = dur === "" ? null : +dur;
-    s.volume = +document.getElementById("f-vol").value;
-    s.css_class = document.getElementById("f-css").value;
-    saveSlot(s);
+    persist(s, body).catch(function () {});
   });
 
   list.addEventListener("click", function (e) {
@@ -610,8 +740,8 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id: id, label: "New slot", x: 80, y: 80, w: 320, h: 180, z: n,
-        media_kind: "none", media_path: "", text_template: "New slot", playback: "once",
-        duration_ms: 5000, volume: 100, enabled: true, css_class: "",
+        media_kind: "text", media_path: "", text_template: "New slot", playback: "once",
+        duration_ms: 5000, volume: 100, enabled: true, parent_id: "", theme: "plain",
       }),
     }).then(function () { sel = id; return load(); });
   });
@@ -738,6 +868,13 @@
     }
     w = Math.max(32, w); h = Math.max(32, h);
     var gx = axisGuides(true), gy = axisGuides(false);
+    if (s.parent_id) {
+      var par = slotById(s.parent_id);
+      if (par) {
+        gx = [0, par.w, par.w / 2];
+        gy = [0, par.h, par.h / 2];
+      }
+    }
     if (hdl === "move") {
       x = snapEdge(x, w, gx);
       y = snapEdge(y, h, gy);
@@ -747,8 +884,11 @@
       if (hdl.indexOf("n") >= 0) y = snapVal(y, gy);
       if (hdl.indexOf("s") >= 0) h = Math.max(32, snapVal(y + h, gy) - y);
     }
-    x = Math.max(0, Math.min(state.canvas.w - w, x));
-    y = Math.max(0, Math.min(state.canvas.h - h, y));
+    var lim = boundsFor(s);
+    w = Math.max(32, Math.min(w, lim.w));
+    h = Math.max(32, Math.min(h, lim.h));
+    x = Math.max(0, Math.min(lim.w - w, x));
+    y = Math.max(0, Math.min(lim.h - h, y));
     s.x = Math.round(x); s.y = Math.round(y); s.w = Math.round(w); s.h = Math.round(h);
     var fx = document.getElementById("f-x");
     if (fx) {

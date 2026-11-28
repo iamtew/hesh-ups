@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"io"
 	"mime/multipart"
@@ -206,7 +207,7 @@ func TestR5HideAll(t *testing.T) {
 	putLogo(t, s, ts)
 	doJSON(t, "PUT", ts.URL+"/api/slots/a", map[string]any{
 		"id": "a", "label": "A", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "A", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "A", "playback": "once", "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
@@ -285,7 +286,7 @@ func TestR9InvalidID(t *testing.T) {
 	_, ts := testSrv(t)
 	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/Not%20Valid", map[string]any{
 		"id": "Not Valid", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 400 {
 		t.Fatal(res.StatusCode)
@@ -297,7 +298,7 @@ func TestR10Token(t *testing.T) {
 	doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"token": "secret"})
 	doJSON(t, "PUT", ts.URL+"/api/slots/t", map[string]any{
 		"id": "t", "label": "t", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "hi", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "hi", "playback": "once", "volume": 100, "enabled": true,
 	})
 	res, _ := doJSON(t, "POST", ts.URL+"/api/popup/t", nil)
 	if res.StatusCode != 401 {
@@ -372,7 +373,7 @@ func TestR14Text(t *testing.T) {
 	_, ts := testSrv(t)
 	doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "f", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "Thanks {user}!", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "Thanks {user}!", "playback": "once", "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
@@ -401,7 +402,7 @@ func TestDurationZeroIsSticky(t *testing.T) {
 	_, ts := testSrv(t)
 	doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "f", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "Hi", "playback": "once", "duration_ms": 0, "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "Hi", "playback": "once", "duration_ms": 0, "volume": 100, "enabled": true,
 	})
 	doJSON(t, "POST", ts.URL+"/api/popup/follow", nil)
 	time.Sleep(80 * time.Millisecond)
@@ -427,7 +428,7 @@ func TestR15Empty(t *testing.T) {
 	_, ts := testSrv(t)
 	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/empty", map[string]any{
 		"id": "empty", "label": "e", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 400 {
 		t.Fatal(res.StatusCode)
@@ -438,7 +439,7 @@ func TestR16LoopDuration(t *testing.T) {
 	_, ts := testSrv(t)
 	doJSON(t, "PUT", ts.URL+"/api/slots/loop", map[string]any{
 		"id": "loop", "label": "l", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "x", "playback": "loop", "duration_ms": 200, "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "x", "playback": "loop", "duration_ms": 200, "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
@@ -513,7 +514,7 @@ func TestR18Reserved(t *testing.T) {
 	_, ts := testSrv(t)
 	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/hide_all", map[string]any{
 		"id": "hide_all", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
-		"media_kind": "none", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
+		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 400 {
 		t.Fatal(res.StatusCode)
@@ -745,6 +746,124 @@ func TestViewCloseAndHelp(t *testing.T) {
 	}
 	if closed != 1 || helped != 1 {
 		t.Fatal(closed, helped)
+	}
+}
+
+func TestSharedBanner(t *testing.T) {
+	_, ts := testSrv(t)
+	res, err := http.Get(ts.URL + "/shared/banner.css")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode)
+	}
+}
+
+func TestExclusiveKinds(t *testing.T) {
+	_, ts := testSrv(t)
+	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/bad", map[string]any{
+		"id": "bad", "label": "b", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
+		"media_kind": "none", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
+	})
+	if res.StatusCode != 400 {
+		t.Fatal("none should 400", res.StatusCode)
+	}
+	res, _ = doJSON(t, "PUT", ts.URL+"/api/slots/img", map[string]any{
+		"id": "img", "label": "i", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
+		"media_kind": "image", "media_path": "", "playback": "once", "volume": 100, "enabled": true,
+	})
+	if res.StatusCode != 400 {
+		t.Fatal("image without path", res.StatusCode)
+	}
+}
+
+func TestGroupFire(t *testing.T) {
+	_, ts := testSrv(t)
+	res, b := doJSON(t, "PUT", ts.URL+"/api/slots/raid", map[string]any{
+		"id": "raid", "label": "Raid", "x": 10, "y": 10, "w": 400, "h": 200, "z": 1,
+		"media_kind": "group", "playback": "once", "volume": 100, "enabled": true,
+	})
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid", nil)
+	if res.StatusCode != 400 {
+		t.Fatal("empty group", res.StatusCode, string(b))
+	}
+	doJSON(t, "PUT", ts.URL+"/api/slots/raid-t", map[string]any{
+		"id": "raid-t", "label": "t", "x": 0, "y": 0, "w": 100, "h": 40, "z": 0,
+		"media_kind": "text", "text_template": "Hi {user}", "playback": "once", "volume": 100,
+		"enabled": true, "parent_id": "raid", "theme": "lcd-glass",
+	})
+	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid-t?user=Ada", nil)
+	if res.StatusCode != 404 {
+		t.Fatal("child fire", res.StatusCode, string(b))
+	}
+	c := wsDial(t, ts)
+	readType(t, c, "config", 2*time.Second)
+	readType(t, c, "snapshot", 2*time.Second)
+	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid?user=Ada", nil)
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode, string(b))
+	}
+	show := readType(t, c, "show", 2*time.Second)
+	if show["media_kind"] != "group" {
+		t.Fatal(show)
+	}
+	mem, _ := show["members"].([]any)
+	if len(mem) != 1 {
+		t.Fatalf("members %v", show["members"])
+	}
+	m0 := mem[0].(map[string]any)
+	if m0["text"] != "Hi Ada" || m0["theme"] != "lcd-glass" {
+		t.Fatal(m0)
+	}
+	doJSON(t, "POST", ts.URL+"/api/popup/raid/hide", nil)
+	hide := readType(t, c, "hide", 2*time.Second)
+	if hide["slot"] != "raid" {
+		t.Fatal(hide)
+	}
+}
+
+func TestSchemaV1Migrate(t *testing.T) {
+	dir := t.TempDir()
+	dbp := filepath.Join(dir, "old.sqlite")
+	db, err := sql.Open("sqlite", dbp+"?_pragma=busy_timeout(5000)")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, q := range []string{
+		`CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
+		`CREATE TABLE slots (
+			id TEXT PRIMARY KEY, label TEXT NOT NULL, x INTEGER NOT NULL, y INTEGER NOT NULL,
+			w INTEGER NOT NULL, h INTEGER NOT NULL, z INTEGER NOT NULL DEFAULT 0,
+			media_kind TEXT NOT NULL, media_path TEXT NOT NULL DEFAULT '',
+			text_template TEXT NOT NULL DEFAULT '', playback TEXT NOT NULL DEFAULT 'once',
+			duration_ms INTEGER, volume INTEGER NOT NULL DEFAULT 100,
+			enabled INTEGER NOT NULL DEFAULT 1, css_class TEXT)`,
+		`CREATE TABLE event_log (id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, action TEXT NOT NULL, slot_id TEXT, detail TEXT NOT NULL DEFAULT '', result TEXT NOT NULL)`,
+		`CREATE TABLE visible (slot_id TEXT PRIMARY KEY, seq INTEGER NOT NULL, text TEXT NOT NULL DEFAULT '', media_kind TEXT NOT NULL, media_path TEXT NOT NULL DEFAULT '')`,
+		`INSERT INTO settings(key,value) VALUES('schema_version','1')`,
+		`INSERT INTO slots(id,label,x,y,w,h,z,media_kind,media_path,text_template,playback,volume,enabled) VALUES('old','Old',0,0,40,40,0,'none','','Hi','once',100,1)`,
+	} {
+		if _, err := db.Exec(q); err != nil {
+			t.Fatal(q, err)
+		}
+	}
+	db.Close()
+	s, err := NewServer(dbp, "0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	sl, ok := s.getSlot("old")
+	if !ok || sl.MediaKind != "text" || sl.Theme != "plain" {
+		t.Fatalf("%v %v", ok, sl)
+	}
+	if s.setting("schema_version") != "2" {
+		t.Fatal(s.setting("schema_version"))
 	}
 }
 
