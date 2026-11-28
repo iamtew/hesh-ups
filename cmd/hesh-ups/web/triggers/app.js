@@ -112,10 +112,10 @@
   }
 
   function setAllBtn(live) {
-    var btn = document.getElementById("btn-hide-all");
-    btn.innerHTML = live ? icon("eye-off") + " Hide all" : icon("eye") + " Show all";
+    var btn = document.getElementById("btn-stop-all");
+    btn.innerHTML = live ? icon("x") + " Stop all" : icon("eye") + " Show all";
     btn.setAttribute("aria-pressed", live ? "true" : "false");
-    btn.dataset.mode = live ? "hide" : "show";
+    btn.dataset.mode = live ? "stop" : "show";
   }
 
   function paintLive(rows) {
@@ -207,8 +207,8 @@
     }
   });
 
-  document.getElementById("btn-hide-all").addEventListener("click", function () {
-    var btn = document.getElementById("btn-hide-all");
+  document.getElementById("btn-stop-all").addEventListener("click", function () {
+    var btn = document.getElementById("btn-stop-all");
     if (btn.dataset.mode === "show") {
       var ids = [];
       list.querySelectorAll(".row:not(.off)").forEach(function (row) {
@@ -222,11 +222,11 @@
       }).catch(function () { setStatus("Show all failed"); });
       return;
     }
-    fetch(origin() + "/api/popup/hide_all" + tokenQuery(), { method: "POST" }).then(function (r) {
+    fetch(origin() + "/api/popup/stop_all" + tokenQuery(), { method: "POST" }).then(function (r) {
       if (!r.ok) return errMsg(r).then(setStatus);
-      setStatus("Hidden all");
+      setStatus("Stopped all");
       return load();
-    }).catch(function () { setStatus("Hide all failed"); });
+    }).catch(function () { setStatus("Stop all failed"); });
   });
 
   fetch("/api/settings").then(function (r) { return r.json(); }).then(function (kv) {

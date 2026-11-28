@@ -271,11 +271,11 @@ func TestR5HideAll(t *testing.T) {
 	doJSON(t, "POST", ts.URL+"/api/popup/a", nil)
 	readType(t, c, "show", 2*time.Second)
 	readType(t, c, "show", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/hide_all", nil)
+	doJSON(t, "POST", ts.URL+"/api/popup/stop_all", nil)
 	readType(t, c, "clear", 2*time.Second)
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
-	if st["events"].([]any)[0].(map[string]any)["action"] != "hide_all" {
+	if st["events"].([]any)[0].(map[string]any)["action"] != "stop_all" {
 		t.Fatal(st["events"])
 	}
 }
@@ -567,8 +567,8 @@ func itoa(n int) string {
 
 func TestR18Reserved(t *testing.T) {
 	_, ts := testSrv(t)
-	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/hide_all", map[string]any{
-		"id": "hide_all", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
+	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/stop_all", map[string]any{
+		"id": "stop_all", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 400 {

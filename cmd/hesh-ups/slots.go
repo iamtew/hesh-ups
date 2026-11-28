@@ -255,7 +255,7 @@ func (s *Server) hide(id string, reason string) {
 	s.hub.broadcast(map[string]any{"type": "hide", "slot": id})
 }
 
-func (s *Server) hideAll() {
+func (s *Server) stopAll() {
 	s.mu.Lock()
 	s.live = map[string]liveSlot{}
 	for id, t := range s.timers {
@@ -264,7 +264,7 @@ func (s *Server) hideAll() {
 	}
 	s.mu.Unlock()
 	_, _ = s.db.Exec(`DELETE FROM visible`)
-	s.logEvent("hide_all", "", "", "ok")
+	s.logEvent("stop_all", "", "", "ok")
 	s.hub.broadcast(map[string]any{"type": "clear"})
 }
 
@@ -309,7 +309,7 @@ func validSlot(sl Slot) (errKey, msg string) {
 	if !slotIDRe.MatchString(sl.ID) {
 		return "invalid_slot", "invalid slot id"
 	}
-	if sl.ID == "hide_all" {
+	if sl.ID == "stop_all" {
 		return "reserved_id", "reserved id"
 	}
 	switch sl.MediaKind {

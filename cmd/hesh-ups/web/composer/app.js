@@ -958,14 +958,14 @@
   document.getElementById("copy-overlay").addEventListener("click", function () {
     copyText(origin() + "/overlay/").then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
   });
-  document.getElementById("hide-all").addEventListener("click", function () {
-    fetch(origin() + "/api/popup/hide_all" + tokenQuery(), { method: "POST" }).then(function (r) {
+  document.getElementById("stop-all").addEventListener("click", function () {
+    fetch(origin() + "/api/popup/stop_all" + tokenQuery(), { method: "POST" }).then(function (r) {
       if (r.ok) {
         state.slots.forEach(function (sl) { sl.visible = false; });
         state.slots.filter(function (sl) { return !sl.parent_id; }).forEach(paintSlotTree);
-        setStatus("Hidden all");
+        setStatus("Stopped all");
       } else errMsg(r).then(setStatus);
-    }).catch(function () { setStatus("Hide all failed"); });
+    }).catch(function () { setStatus("Stop all failed"); });
   });
   document.getElementById("btn720").addEventListener("click", function () {
     fetch("/api/settings", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ canvas_w: "1280", canvas_h: "720" }) }).then(load);

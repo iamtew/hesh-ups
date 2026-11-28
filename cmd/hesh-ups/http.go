@@ -88,8 +88,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/quit", s.handleQuit)
 	mux.HandleFunc("POST /api/view/close", s.handleViewClose)
 	mux.HandleFunc("POST /api/help", s.handleHelp)
-	mux.HandleFunc("GET /api/popup/hide_all", s.authed(s.handleHideAll))
-	mux.HandleFunc("POST /api/popup/hide_all", s.authed(s.handleHideAll))
+	mux.HandleFunc("GET /api/popup/stop_all", s.authed(s.handleStopAll))
+	mux.HandleFunc("POST /api/popup/stop_all", s.authed(s.handleStopAll))
 	mux.HandleFunc("GET /api/popup/{id}/hide", s.authed(s.handleHide))
 	mux.HandleFunc("POST /api/popup/{id}/hide", s.authed(s.handleHide))
 	mux.HandleFunc("GET /api/popup/{id}", s.authed(s.handleFire))
@@ -301,8 +301,8 @@ func (s *Server) handleHide(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, map[string]any{"ok": true, "id": id, "visible": false})
 }
 
-func (s *Server) handleHideAll(w http.ResponseWriter, r *http.Request) {
-	s.hideAll()
+func (s *Server) handleStopAll(w http.ResponseWriter, r *http.Request) {
+	s.stopAll()
 	writeJSON(w, 200, map[string]any{"ok": true})
 }
 
