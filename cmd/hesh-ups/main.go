@@ -39,6 +39,10 @@ func run() error {
 		os.Exit(1)
 	}
 	go http.Serve(ln, srv.Handler())
+	if os.Getenv("HESH_UPS_HTTP") == "1" {
+		fmt.Fprintln(os.Stderr, "http "+addr)
+		select {}
+	}
 	runTray(srv)
 	return nil
 }
