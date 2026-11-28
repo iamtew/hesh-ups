@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"io"
 	"mime/multipart"
+	"net"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,21 +27,32 @@ var png1x1 = []byte{
 	0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 }
 
-func testSrv(t *testing.T) (*Server, *httptest.Server) {
+// serveTest is main's listen path: net.Listen + Server.Serve. Port 0 stays off :18745.
+func serveTest(t *testing.T, s *Server) (string, func()) {
+	t.Helper()
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	go s.Serve(ln)
+	return "http://" + ln.Addr().String(), func() { ln.Close() }
+}
+
+func testSrv(t *testing.T) (*Server, string) {
 	t.Helper()
 	dir := t.TempDir()
 	s, err := NewServer(filepath.Join(dir, "t.sqlite"), "0.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(s.Handler())
-	t.Cleanup(func() { ts.Close(); s.Close() })
-	return s, ts
+	url, stop := serveTest(t, s)
+	t.Cleanup(func() { stop(); s.Close() })
+	return s, url
 }
 
-func getJSON(t *testing.T, ts *httptest.Server, path string, dest any) *http.Response {
+func getJSON(t *testing.T, base, path string, dest any) *http.Response {
 	t.Helper()
-	res, err := http.Get(ts.URL + path)
+	res, err := http.Get(base + path)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,12 +87,12 @@ func doJSON(t *testing.T, method, url string, body any) (*http.Response, []byte)
 	return res, b
 }
 
-func putLogo(t *testing.T, s *Server, ts *httptest.Server) {
+func putLogo(t *testing.T, s *Server, base string) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(s.mediaDir, "logo.png"), png1x1, 0644); err != nil {
 		t.Fatal(err)
 	}
-	res, b := doJSON(t, "PUT", ts.URL+"/api/slots/logo", map[string]any{
+	res, b := doJSON(t, "PUT", base+"/api/slots/logo", map[string]any{
 		"id": "logo", "label": "Logo", "x": 100, "y": 40, "w": 320, "h": 180, "z": 1,
 		"media_kind": "image", "media_path": "logo.png", "text_template": "",
 		"playback": "once", "duration_ms": nil, "volume": 100, "enabled": true, "css_class": "",
@@ -91,9 +102,9 @@ func putLogo(t *testing.T, s *Server, ts *httptest.Server) {
 	}
 }
 
-func wsDial(t *testing.T, ts *httptest.Server) *websocket.Conn {
+func wsDial(t *testing.T, base string) *websocket.Conn {
 	t.Helper()
-	u := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	u := "ws" + strings.TrimPrefix(base, "http") + "/ws"
 	c, _, err := websocket.Dial(context.Background(), u, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -160,7 +171,7 @@ func TestR3Fire(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	res, _ := doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode)
 	}
@@ -188,9 +199,9 @@ func TestR4Stop(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	readType(t, c, "show", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo/stop", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo/stop", nil)
 	stop := readType(t, c, "stop", 2*time.Second)
 	if stop["slot"] != "logo" {
 		t.Fatal(stop)
@@ -211,7 +222,7 @@ func TestHubConcurrentWrites(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		post := func(path string) {
-			res, err := http.Post(ts.URL+path, "application/json", strings.NewReader("{}"))
+			res, err := http.Post(ts+path, "application/json", strings.NewReader("{}"))
 			if err != nil {
 				return
 			}
@@ -260,18 +271,18 @@ func TestHubConcurrentWrites(t *testing.T) {
 func TestR5StopAll(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "PUT", ts.URL+"/api/slots/a", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/a", map[string]any{
 		"id": "a", "label": "A", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "A", "playback": "once", "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
-	doJSON(t, "POST", ts.URL+"/api/popup/a", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo", nil)
+	doJSON(t, "POST", ts+"/api/popup/a", nil)
 	readType(t, c, "show", 2*time.Second)
 	readType(t, c, "show", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/stop_all", nil)
+	doJSON(t, "POST", ts+"/api/popup/stop_all", nil)
 	readType(t, c, "clear", 2*time.Second)
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
@@ -283,7 +294,7 @@ func TestR5StopAll(t *testing.T) {
 func TestR6Duration(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo?duration_ms=200", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo?duration_ms=200", nil)
 	time.Sleep(400 * time.Millisecond)
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
@@ -298,9 +309,9 @@ func TestR6Duration(t *testing.T) {
 func TestR7RestartTimer(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo?duration_ms=500", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo?duration_ms=500", nil)
 	time.Sleep(300 * time.Millisecond)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo?duration_ms=500", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo?duration_ms=500", nil)
 	time.Sleep(300 * time.Millisecond)
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
@@ -326,7 +337,7 @@ func TestR7RestartTimer(t *testing.T) {
 
 func TestR8Unknown(t *testing.T) {
 	_, ts := testSrv(t)
-	res, b := doJSON(t, "POST", ts.URL+"/api/popup/nope", nil)
+	res, b := doJSON(t, "POST", ts+"/api/popup/nope", nil)
 	if res.StatusCode != 404 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -339,7 +350,7 @@ func TestR8Unknown(t *testing.T) {
 
 func TestR9InvalidID(t *testing.T) {
 	_, ts := testSrv(t)
-	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/Not%20Valid", map[string]any{
+	res, _ := doJSON(t, "PUT", ts+"/api/slots/Not%20Valid", map[string]any{
 		"id": "Not Valid", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
@@ -350,16 +361,16 @@ func TestR9InvalidID(t *testing.T) {
 
 func TestR10Token(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"token": "secret"})
-	doJSON(t, "PUT", ts.URL+"/api/slots/t", map[string]any{
+	doJSON(t, "PUT", ts+"/api/settings", map[string]string{"token": "secret"})
+	doJSON(t, "PUT", ts+"/api/slots/t", map[string]any{
 		"id": "t", "label": "t", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "hi", "playback": "once", "volume": 100, "enabled": true,
 	})
-	res, _ := doJSON(t, "POST", ts.URL+"/api/popup/t", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/popup/t", nil)
 	if res.StatusCode != 401 {
 		t.Fatal(res.StatusCode)
 	}
-	res, _ = doJSON(t, "POST", ts.URL+"/api/popup/t?token=secret", nil)
+	res, _ = doJSON(t, "POST", ts+"/api/popup/t?token=secret", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode)
 	}
@@ -380,7 +391,7 @@ func TestR11OBSOptional(t *testing.T) {
 	if st["obs"].(map[string]any)["connected"] != false {
 		t.Fatal(st["obs"])
 	}
-	res, _ := doJSON(t, "POST", ts.URL+"/api/obs/browser-source", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/obs/browser-source", nil)
 	if res.StatusCode != 503 {
 		t.Fatal(res.StatusCode)
 	}
@@ -389,7 +400,7 @@ func TestR11OBSOptional(t *testing.T) {
 func TestR12Snapshot(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	c := wsDial(t, ts)
 	cfg := readType(t, c, "config", 2*time.Second)
 	if cfg["type"] != "config" {
@@ -414,9 +425,8 @@ func TestR13DBOverride(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s2.Close()
-	ts2 := httptest.NewServer(s2.Handler())
-	defer ts2.Close()
+	ts2, stop2 := serveTest(t, s2)
+	defer func() { stop2(); s2.Close() }()
 	var st map[string]any
 	getJSON(t, ts2, "/api/state", &st)
 	if len(st["slots"].([]any)) != 0 {
@@ -426,14 +436,14 @@ func TestR13DBOverride(t *testing.T) {
 
 func TestR14Text(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "f", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "Thanks {user}!", "playback": "once", "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	res, b := doJSON(t, "POST", ts.URL+"/api/popup/follow?user=Ada", nil)
+	res, b := doJSON(t, "POST", ts+"/api/popup/follow?user=Ada", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(string(b))
 	}
@@ -446,7 +456,7 @@ func TestR14Text(t *testing.T) {
 	if show["text"] != "Thanks Ada!" {
 		t.Fatal(show)
 	}
-	res, b = doJSON(t, "POST", ts.URL+"/api/popup/follow", nil)
+	res, b = doJSON(t, "POST", ts+"/api/popup/follow", nil)
 	json.Unmarshal(b, &body)
 	if body["text"] != "Thanks !" {
 		t.Fatal(body)
@@ -455,11 +465,11 @@ func TestR14Text(t *testing.T) {
 
 func TestDurationZeroIsSticky(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "f", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "Hi", "playback": "once", "duration_ms": 0, "volume": 100, "enabled": true,
 	})
-	doJSON(t, "POST", ts.URL+"/api/popup/follow", nil)
+	doJSON(t, "POST", ts+"/api/popup/follow", nil)
 	time.Sleep(80 * time.Millisecond)
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
@@ -481,7 +491,7 @@ func TestDurationZeroIsSticky(t *testing.T) {
 
 func TestR15Empty(t *testing.T) {
 	_, ts := testSrv(t)
-	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/empty", map[string]any{
+	res, _ := doJSON(t, "PUT", ts+"/api/slots/empty", map[string]any{
 		"id": "empty", "label": "e", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "", "playback": "once", "volume": 100, "enabled": true,
 	})
@@ -492,14 +502,14 @@ func TestR15Empty(t *testing.T) {
 
 func TestR16LoopDuration(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/slots/loop", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/loop", map[string]any{
 		"id": "loop", "label": "l", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "x", "playback": "loop", "duration_ms": 200, "volume": 100, "enabled": true,
 	})
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/loop", nil)
+	doJSON(t, "POST", ts+"/api/popup/loop", nil)
 	show := readType(t, c, "show", 2*time.Second)
 	if show["playback"] != "loop" {
 		t.Fatal(show)
@@ -518,7 +528,7 @@ func TestR16LoopDuration(t *testing.T) {
 func TestR17Ended(t *testing.T) {
 	s, ts := testSrv(t)
 	os.WriteFile(filepath.Join(s.mediaDir, "clip.webm"), []byte("x"), 0644)
-	doJSON(t, "PUT", ts.URL+"/api/slots/clip", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/clip", map[string]any{
 		"id": "clip", "label": "c", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "video", "media_path": "clip.webm", "text_template": "",
 		"playback": "once", "duration_ms": nil, "volume": 100, "enabled": true,
@@ -526,16 +536,16 @@ func TestR17Ended(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/clip", nil)
+	doJSON(t, "POST", ts+"/api/popup/clip", nil)
 	show := readType(t, c, "show", 2*time.Second)
 	seq := int(show["seq"].(float64))
 	_ = c.Write(context.Background(), websocket.MessageText, []byte(`{"type":"ended","slot":"clip","seq":`+itoa(seq)+`}`))
 	readType(t, c, "stop", 2*time.Second)
 
-	doJSON(t, "POST", ts.URL+"/api/popup/clip", nil)
+	doJSON(t, "POST", ts+"/api/popup/clip", nil)
 	show = readType(t, c, "show", 2*time.Second)
 	n := int(show["seq"].(float64))
-	doJSON(t, "POST", ts.URL+"/api/popup/clip", nil)
+	doJSON(t, "POST", ts+"/api/popup/clip", nil)
 	show = readType(t, c, "show", 2*time.Second)
 	_ = show
 	_ = c.Write(context.Background(), websocket.MessageText, []byte(`{"type":"ended","slot":"clip","seq":`+itoa(n)+`}`))
@@ -567,7 +577,7 @@ func itoa(n int) string {
 
 func TestR18Reserved(t *testing.T) {
 	_, ts := testSrv(t)
-	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/stop_all", map[string]any{
+	res, _ := doJSON(t, "PUT", ts+"/api/slots/stop_all", map[string]any{
 		"id": "stop_all", "label": "x", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
@@ -583,7 +593,7 @@ func TestR19Media(t *testing.T) {
 	fw, _ := w.CreateFormFile("file", "logo.png")
 	fw.Write(png1x1)
 	w.Close()
-	req, _ := http.NewRequest("POST", ts.URL+"/api/media", &buf)
+	req, _ := http.NewRequest("POST", ts+"/api/media", &buf)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -599,7 +609,7 @@ func TestR19Media(t *testing.T) {
 	if m["kind"] != "image" {
 		t.Fatal(m)
 	}
-	gr, err := http.Get(ts.URL + "/media/" + m["path"].(string))
+	gr, err := http.Get(ts + "/media/" + m["path"].(string))
 	if err != nil || gr.StatusCode != 200 {
 		t.Fatal(gr)
 	}
@@ -610,7 +620,7 @@ func TestR19Media(t *testing.T) {
 	fw, _ = w.CreateFormFile("file", "../x.png")
 	fw.Write(png1x1)
 	w.Close()
-	req, _ = http.NewRequest("POST", ts.URL+"/api/media", &buf)
+	req, _ = http.NewRequest("POST", ts+"/api/media", &buf)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	res, _ = http.DefaultClient.Do(req)
 	b, _ = io.ReadAll(res.Body)
@@ -623,7 +633,7 @@ func TestR19Media(t *testing.T) {
 	fw, _ = w.CreateFormFile("file", "x.exe")
 	fw.Write([]byte("MZ"))
 	w.Close()
-	req, _ = http.NewRequest("POST", ts.URL+"/api/media", &buf)
+	req, _ = http.NewRequest("POST", ts+"/api/media", &buf)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	res, _ = http.DefaultClient.Do(req)
 	res.Body.Close()
@@ -635,7 +645,7 @@ func TestR19Media(t *testing.T) {
 func TestR20Volume(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "PUT", ts.URL+"/api/slots/logo", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/logo", map[string]any{
 		"id": "logo", "label": "Logo", "x": 100, "y": 40, "w": 320, "h": 180, "z": 1,
 		"media_kind": "image", "media_path": "logo.png", "text_template": "",
 		"playback": "once", "volume": 40, "enabled": true,
@@ -643,7 +653,7 @@ func TestR20Volume(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	show := readType(t, c, "show", 2*time.Second)
 	if show["volume"] != float64(40) {
 		t.Fatal(show)
@@ -657,19 +667,18 @@ func TestR21Sticky(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts := httptest.NewServer(s.Handler())
+	ts, stop := serveTest(t, s)
 	putLogo(t, s, ts)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
-	ts.Close()
+	doJSON(t, "POST", ts+"/api/popup/logo", nil)
+	stop()
 	s.Close()
 
 	s2, err := NewServer(db, "0.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s2.Close()
-	ts2 := httptest.NewServer(s2.Handler())
-	defer ts2.Close()
+	ts2, stop2 := serveTest(t, s2)
+	defer func() { stop2(); s2.Close() }()
 	var st map[string]any
 	getJSON(t, ts2, "/api/state", &st)
 	ok := false
@@ -700,23 +709,22 @@ func TestR21Sticky(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	ts3 := httptest.NewServer(s3.Handler())
+	ts3, stop3 := serveTest(t, s3)
 	os.WriteFile(filepath.Join(s3.mediaDir, "logo.png"), png1x1, 0644)
-	doJSON(t, "PUT", ts3.URL+"/api/slots/logo", map[string]any{
+	doJSON(t, "PUT", ts3+"/api/slots/logo", map[string]any{
 		"id": "logo", "label": "Logo", "x": 1, "y": 1, "w": 40, "h": 40, "z": 0,
 		"media_kind": "image", "media_path": "logo.png", "playback": "once", "duration_ms": 200, "volume": 100, "enabled": true,
 	})
-	doJSON(t, "POST", ts3.URL+"/api/popup/logo", nil)
+	doJSON(t, "POST", ts3+"/api/popup/logo", nil)
 	time.Sleep(400 * time.Millisecond)
-	ts3.Close()
+	stop3()
 	s3.Close()
 	s4, err := NewServer(db3, "0.0.1")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer s4.Close()
-	ts4 := httptest.NewServer(s4.Handler())
-	defer ts4.Close()
+	ts4, stop4 := serveTest(t, s4)
+	defer func() { stop4(); s4.Close() }()
 	getJSON(t, ts4, "/api/state", &st)
 	for _, raw := range st["slots"].([]any) {
 		m := raw.(map[string]any)
@@ -729,11 +737,11 @@ func TestR21Sticky(t *testing.T) {
 func TestR22Disabled(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "PUT", ts.URL+"/api/slots/logo", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/logo", map[string]any{
 		"id": "logo", "label": "Logo", "x": 100, "y": 40, "w": 320, "h": 180, "z": 1,
 		"media_kind": "image", "media_path": "logo.png", "playback": "once", "volume": 100, "enabled": false,
 	})
-	res, b := doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	res, b := doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	if res.StatusCode != 404 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -741,7 +749,7 @@ func TestR22Disabled(t *testing.T) {
 
 func TestR23Envelope(t *testing.T) {
 	_, ts := testSrv(t)
-	res, b := doJSON(t, "POST", ts.URL+"/api/popup/nope", nil)
+	res, b := doJSON(t, "POST", ts+"/api/popup/nope", nil)
 	if res.StatusCode != 404 {
 		t.Fatal(res.StatusCode)
 	}
@@ -754,7 +762,7 @@ func TestR23Envelope(t *testing.T) {
 
 func TestGetSettings(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"token": "secret"})
+	doJSON(t, "PUT", ts+"/api/settings", map[string]string{"token": "secret"})
 	var kv map[string]string
 	res := getJSON(t, ts, "/api/settings", &kv)
 	if res.StatusCode != 200 {
@@ -777,7 +785,7 @@ func TestQuitHook(t *testing.T) {
 	closed := 0
 	s.closeViews = func() { closed++ }
 	s.onQuit = func() { n++ }
-	res, _ := doJSON(t, "POST", ts.URL+"/api/quit", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/quit", nil)
 	if res.StatusCode != 204 {
 		t.Fatal(res.StatusCode)
 	}
@@ -791,11 +799,11 @@ func TestViewCloseAndHelp(t *testing.T) {
 	closed, helped := 0, 0
 	s.closeViews = func() { closed++ }
 	s.onHelp = func() { helped++ }
-	res, _ := doJSON(t, "POST", ts.URL+"/api/view/close", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/view/close", nil)
 	if res.StatusCode != 204 {
 		t.Fatal(res.StatusCode)
 	}
-	res, _ = doJSON(t, "POST", ts.URL+"/api/help", nil)
+	res, _ = doJSON(t, "POST", ts+"/api/help", nil)
 	if res.StatusCode != 204 {
 		t.Fatal(res.StatusCode)
 	}
@@ -807,7 +815,7 @@ func TestViewCloseAndHelp(t *testing.T) {
 func TestEnabledPut(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
-	doJSON(t, "PUT", ts.URL+"/api/slots/logo", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/logo", map[string]any{
 		"id": "logo", "label": "Logo", "x": 100, "y": 40, "w": 320, "h": 180, "z": 1,
 		"media_kind": "image", "media_path": "logo.png", "playback": "once", "volume": 100, "enabled": false,
 	})
@@ -819,7 +827,7 @@ func TestEnabledPut(t *testing.T) {
 			t.Fatal(m["enabled"])
 		}
 	}
-	res, _ := doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	res, _ := doJSON(t, "POST", ts+"/api/popup/logo", nil)
 	if res.StatusCode != 404 {
 		t.Fatal(res.StatusCode)
 	}
@@ -827,7 +835,7 @@ func TestEnabledPut(t *testing.T) {
 
 func TestSharedBanner(t *testing.T) {
 	_, ts := testSrv(t)
-	res, err := http.Get(ts.URL + "/shared/banner.css")
+	res, err := http.Get(ts + "/shared/banner.css")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -839,7 +847,7 @@ func TestSharedBanner(t *testing.T) {
 
 func TestTriggersPage(t *testing.T) {
 	_, ts := testSrv(t)
-	res, err := http.Get(ts.URL + "/triggers/")
+	res, err := http.Get(ts + "/triggers/")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -855,7 +863,7 @@ func TestTriggersPage(t *testing.T) {
 		return http.ErrUseLastResponse
 	}}
 	for _, path := range []string{"/triggers", "/board", "/board/"} {
-		redir, err := c.Get(ts.URL + path)
+		redir, err := c.Get(ts + path)
 		if err != nil {
 			t.Fatal(path, err)
 		}
@@ -868,14 +876,14 @@ func TestTriggersPage(t *testing.T) {
 
 func TestExclusiveKinds(t *testing.T) {
 	_, ts := testSrv(t)
-	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/bad", map[string]any{
+	res, _ := doJSON(t, "PUT", ts+"/api/slots/bad", map[string]any{
 		"id": "bad", "label": "b", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "none", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 400 {
 		t.Fatal("none should 400", res.StatusCode)
 	}
-	res, _ = doJSON(t, "PUT", ts.URL+"/api/slots/img", map[string]any{
+	res, _ = doJSON(t, "PUT", ts+"/api/slots/img", map[string]any{
 		"id": "img", "label": "i", "x": 0, "y": 0, "w": 40, "h": 40, "z": 0,
 		"media_kind": "image", "media_path": "", "playback": "once", "volume": 100, "enabled": true,
 	})
@@ -886,30 +894,30 @@ func TestExclusiveKinds(t *testing.T) {
 
 func TestGroupFire(t *testing.T) {
 	_, ts := testSrv(t)
-	res, b := doJSON(t, "PUT", ts.URL+"/api/slots/raid", map[string]any{
+	res, b := doJSON(t, "PUT", ts+"/api/slots/raid", map[string]any{
 		"id": "raid", "label": "Raid", "x": 10, "y": 10, "w": 400, "h": 200, "z": 1,
 		"media_kind": "group", "playback": "once", "volume": 100, "enabled": true,
 	})
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
 	}
-	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid", nil)
+	res, b = doJSON(t, "POST", ts+"/api/popup/raid", nil)
 	if res.StatusCode != 400 {
 		t.Fatal("empty group", res.StatusCode, string(b))
 	}
-	doJSON(t, "PUT", ts.URL+"/api/slots/raid-t", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/raid-t", map[string]any{
 		"id": "raid-t", "label": "t", "x": 0, "y": 0, "w": 100, "h": 40, "z": 0,
 		"media_kind": "text", "text_template": "Hi {user}", "playback": "once", "volume": 100,
 		"enabled": true, "parent_id": "raid", "theme": "lcd-glass",
 	})
-	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid-t?user=Ada", nil)
+	res, b = doJSON(t, "POST", ts+"/api/popup/raid-t?user=Ada", nil)
 	if res.StatusCode != 404 {
 		t.Fatal("child fire", res.StatusCode, string(b))
 	}
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	res, b = doJSON(t, "POST", ts.URL+"/api/popup/raid?user=Ada", nil)
+	res, b = doJSON(t, "POST", ts+"/api/popup/raid?user=Ada", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -925,7 +933,7 @@ func TestGroupFire(t *testing.T) {
 	if m0["text"] != "Hi Ada" || m0["theme"] != "lcd-glass" {
 		t.Fatal(m0)
 	}
-	doJSON(t, "POST", ts.URL+"/api/popup/raid/stop", nil)
+	doJSON(t, "POST", ts+"/api/popup/raid/stop", nil)
 	stop := readType(t, c, "stop", 2*time.Second)
 	if stop["slot"] != "raid" {
 		t.Fatal(stop)
@@ -977,7 +985,7 @@ func TestSchemaV1Migrate(t *testing.T) {
 
 func TestObsKickOnSettings(t *testing.T) {
 	_, ts := testSrv(t)
-	res, b := doJSON(t, "PUT", ts.URL+"/api/settings", map[string]string{"obs_password": "x"})
+	res, b := doJSON(t, "PUT", ts+"/api/settings", map[string]string{"obs_password": "x"})
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -985,7 +993,7 @@ func TestObsKickOnSettings(t *testing.T) {
 
 func TestLookRoundtrip(t *testing.T) {
 	_, ts := testSrv(t)
-	res, b := doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+	res, b := doJSON(t, "PUT", ts+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "Follow", "x": 10, "y": 10, "w": 400, "h": 80, "z": 1,
 		"media_kind": "text", "text_template": "Thanks {user}!", "playback": "once",
 		"volume": 100, "enabled": true,
@@ -1004,13 +1012,13 @@ func TestLookRoundtrip(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/follow?user=Ada", nil)
+	doJSON(t, "POST", ts+"/api/popup/follow?user=Ada", nil)
 	show := readType(t, c, "show", 2*time.Second)
 	lk, _ := show["look"].(map[string]any)
 	if lk["align"] != "left" || lk["fit"] != "ellipsis" {
 		t.Fatal(show)
 	}
-	res, b = doJSON(t, "PUT", ts.URL+"/api/slots/follow", map[string]any{
+	res, b = doJSON(t, "PUT", ts+"/api/slots/follow", map[string]any{
 		"id": "follow", "label": "Follow", "x": 10, "y": 10, "w": 400, "h": 80, "z": 1,
 		"media_kind": "text", "text_template": "x", "playback": "once", "volume": 100, "enabled": true,
 		"look": map[string]any{"motion": "zoom"},
@@ -1022,16 +1030,16 @@ func TestLookRoundtrip(t *testing.T) {
 
 func TestDuplicateGroup(t *testing.T) {
 	_, ts := testSrv(t)
-	doJSON(t, "PUT", ts.URL+"/api/slots/raid", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/raid", map[string]any{
 		"id": "raid", "label": "Raid", "x": 0, "y": 0, "w": 200, "h": 100, "z": 1,
 		"media_kind": "group", "playback": "once", "volume": 100, "enabled": true,
 	})
-	doJSON(t, "PUT", ts.URL+"/api/slots/raid-t", map[string]any{
+	doJSON(t, "PUT", ts+"/api/slots/raid-t", map[string]any{
 		"id": "raid-t", "label": "t", "x": 0, "y": 0, "w": 80, "h": 40, "z": 1,
 		"media_kind": "text", "text_template": "Hi", "playback": "once", "volume": 100,
 		"enabled": true, "parent_id": "raid",
 	})
-	res, b := doJSON(t, "POST", ts.URL+"/api/slots/raid/duplicate", nil)
+	res, b := doJSON(t, "POST", ts+"/api/slots/raid/duplicate", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -1052,7 +1060,7 @@ func TestDuplicateGroup(t *testing.T) {
 	if kids != 1 {
 		t.Fatalf("kids %d %+v", kids, st.Slots)
 	}
-	res, _ = doJSON(t, "POST", ts.URL+"/api/slots/raid-t/duplicate", nil)
+	res, _ = doJSON(t, "POST", ts+"/api/slots/raid-t/duplicate", nil)
 	if res.StatusCode != 404 {
 		t.Fatal(res.StatusCode)
 	}
@@ -1067,7 +1075,7 @@ func TestFireMediaVolume(t *testing.T) {
 	c := wsDial(t, ts)
 	readType(t, c, "config", 2*time.Second)
 	readType(t, c, "snapshot", 2*time.Second)
-	res, b := doJSON(t, "POST", ts.URL+"/api/popup/logo?media=alt.png&volume=40", nil)
+	res, b := doJSON(t, "POST", ts+"/api/popup/logo?media=alt.png&volume=40", nil)
 	if res.StatusCode != 200 {
 		t.Fatal(res.StatusCode, string(b))
 	}
@@ -1078,7 +1086,7 @@ func TestFireMediaVolume(t *testing.T) {
 	if vol, _ := show["volume"].(float64); vol != 40 {
 		t.Fatal(show)
 	}
-	res, _ = doJSON(t, "POST", ts.URL+"/api/popup/logo?media=nope.png", nil)
+	res, _ = doJSON(t, "POST", ts+"/api/popup/logo?media=nope.png", nil)
 	if res.StatusCode != 400 {
 		t.Fatal(res.StatusCode)
 	}

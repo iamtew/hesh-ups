@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/fs"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +17,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
 )
 
 //go:embed all:web
@@ -71,6 +71,11 @@ func NewServer(dbPath, version string) (*Server, error) {
 func (s *Server) Close() {
 	s.obs.stop()
 	s.db.Close()
+}
+
+// Serve is the app HTTP server. main and tests both call this.
+func (s *Server) Serve(ln net.Listener) error {
+	return http.Serve(ln, s.Handler())
 }
 
 func (s *Server) Handler() http.Handler {

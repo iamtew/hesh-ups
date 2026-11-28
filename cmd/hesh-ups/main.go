@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"net"
-	"net/http"
 	"os"
 	"path/filepath"
 )
@@ -38,7 +37,7 @@ func run() error {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	go http.Serve(ln, srv.Handler())
+	go srv.Serve(ln)
 	if os.Getenv("HESH_UPS_HTTP") == "1" {
 		fmt.Fprintln(os.Stderr, "http "+addr)
 		select {}

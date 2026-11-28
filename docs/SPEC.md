@@ -255,7 +255,7 @@ Media library is the `media/` directory (`GET /api/media` lists it). No extra ta
 ## Runtime
 
 1. Open SQLite (`HESH_UPS_DB` or default path). Create/migrate. Ensure `media/` exists.
-2. Listen `bind:port`. If bind fails (port in use or permission): log the error to stderr and `os.Exit(1)`. That is the single-instance rule — no mutex, no second socket. Tests MUST NOT call `Listen`; they use `httptest` on the handler.
+2. Listen `bind:port`. If bind fails (port in use or permission): log the error to stderr and `os.Exit(1)`. That is the single-instance rule — no mutex, no second socket. `go test` calls the same `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. It does not bind `:18745`.
 3. Connect obs-websocket in the background; reconnect with backoff. Tray/composer show connected or not. Tests MUST NOT start systray or WebView.
 4. Overlay clients subscribe to `/ws`. On connect: send `config` (canvas + all slots) then `snapshot` (currently visible).
 5. Fire: reject if `enabled=0` (`404` `unknown_slot` — URL dead while the eye is off). Merge vars, render text, bump `seq`, mark visible, log, broadcast `show` (include `volume`). Duration timer if set. Retrigger restarts media, text, `seq`, timer. Persist/delete `visible` per table rules. Stop / stop_all / duration / matching `ended` clear memory, `visible` row, and broadcast.
@@ -573,15 +573,15 @@ Windows. `just build` → one exe (overlay + composer + triggers compiled in). `
 
 ## Verification (Clanker)
 
-`just test` is `go test ./...` (and `go vet`). **In-process:** construct the HTTP handler, `httptest.NewServer` or `ServeHTTP` on `httptest.ResponseRecorder`. Temp dir for `HESH_UPS_DB` + `media/`. Use the same `embed.FS` as production.
+`just test` is `go test ./...` (and `go vet`). It starts the app `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. Use the same `embed.FS` as production.
 
-MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`). `just test` stays in-process and off `:18745`; a Clanker looking at the live overlay uses the process already bound there.
+MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`). A live check is only the tray already on `http://127.0.0.1:18745`. If `GET /api/health` fails, say the tray app is not up. Do not start a second one, do not copy `%APPDATA%\hesh-ups`, do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`.
 
 `just test` must fail if any required case fails.
 
 ### R1 — start
 
-**Given** a temp DB path and the handler  
+**Given** a temp DB and the app server  
 **When** `GET /api/health`  
 **Then** 200, `"ok": true`, `"db": true`, `"version"` set
 
