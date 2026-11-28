@@ -1,26 +1,16 @@
 ---
-description: Operator chrome uses one verb pair; never mix Show/Hide with Fire/Stop
+description: Keep operator language internally consistent; judge it, do not catalog it
 alwaysApply: true
 ---
 
-# Operator words
+# Operator consistency
 
-Meat Bags run this at a desk. Buttons, copied URLs, HTTP paths, event `action`, and status lines use the **same two verbs**.
+Meat Bags operate this at a desk. One job has one name. That name is the same on buttons, copied URLs, HTTP paths, event `action`, status lines, tray copy, and docs.
 
-| Do this | Say this | HTTP |
-| --- | --- | --- |
-| Start or retrigger one slot | **Fire** | `GET\|POST /api/popup/{id}` |
-| Take one slot down | **Stop** | `GET\|POST /api/popup/{id}/stop` |
-| Start every enabled top-level slot | **Fire all** | fire each id (Ada sample on operator chrome) |
-| Panic clear | **Stop all** | `GET\|POST /api/popup/stop_all` |
+You already know whether two words mean the same thing. If they do, pick the one already in use and drop the other. If they do not, they must not sit on the same surface as if they were opposites.
 
-Composer **Test** is Fire with sample `{user}`=Ada. The composer plot **eye** is enable/disable, not Fire/Stop.
+Do not maintain a synonym list in this file. `docs/SPEC.md` is the product. Read the live chrome and match it. Adding a third word for an existing job is a bug. Mixing two families on one control (Show all as the reverse of Stop all) is a bug. A label that changes family by state is a bug.
 
-## Do not
+When you rename, rename the whole family in one pass: UI, routes, events, overlay messages, tests, pages. Alpha: no leftover aliases.
 
-- Mix families on one surface: Hide next to Stop all, Show all as the opposite of Stop all, Play vs Fire.
-- A chameleon button that swaps **Show** / **Hide** / **Stop** by state. Labels stay **Fire** and **Stop**. Two actions, two buttons.
-- Synonyms for the same job (`hide`, `unhide`, `panic`, `clear` on chrome). Overlay WS `show` / `stop` / `clear` maps Fire / Stop / Stop all — do not invent a fourth word on the operator page.
-- Toggle copy as “copy hide URL” when the route is `/stop`.
-
-Alpha: rename the path; no `/hide` alias.
+Internal helpers may keep boring names. Anything a Meat Bag reads or pastes must agree with itself.

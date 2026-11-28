@@ -8,7 +8,7 @@ alwaysApply: true
 Behavior: `docs/SPEC.md`. File layout: `docs/LAYOUT.md`. `AGENTS.md` for ship/tests.
 
 - One Windows systray binary. Bind `127.0.0.1`. No Twitch/TTS/chat/goals.
-- Operator chrome: Fire / Stop / Fire all / Stop all. Never mix Show/Hide with those. `.cursor/rules/operator-words.mdc`.
+- Operator language is one family per job. `.cursor/rules/operator-words.mdc`.
 - Pinned deps only. No extra HTTP framework, ORM, second WS lib, obs-websocket helper, Wails, Fyne, npm.
 - Tests: `httptest` + temp DB. Never exec the exe, never start tray/WebView, never `Listen` on `:18745`.
 - Overlay/composer/triggers live in `cmd/hesh-ups/web/` and embed. No disk UI, no AppData skins.
