@@ -106,7 +106,7 @@ func onReady(s *Server) {
 		for {
 			select {
 			case <-mBoardWin.ClickedCh:
-				openView("Board", base+"/board/", 560, 720)
+				openView("Board", base+"/board/", 640, 760)
 			case <-mBoardWeb.ClickedCh:
 				openBrowser(base + "/board/")
 			case <-mComposerWin.ClickedCh:

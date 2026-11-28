@@ -1,12 +1,25 @@
 (function () {
   var token = "";
   var statusTimer = 0;
+  var lastKey = "";
   var downBanner = document.getElementById("down-banner");
   var list = document.getElementById("list");
   var empty = document.getElementById("empty");
 
   function origin() {
     return location.origin;
+  }
+
+  function icon(name) {
+    return '<svg class="icon" aria-hidden="true"><use href="/composer/icons.svg#tabler-' + name + '"></use></svg>';
+  }
+
+  function kindIcon(s) {
+    if (s.media_kind === "group") return "stack-2";
+    if (s.media_kind === "image" || s.media_kind === "gif") return "photo";
+    if (s.media_kind === "video") return "movie";
+    if (s.media_kind === "audio") return "volume";
+    return "letter-t";
   }
 
   function setStatus(msg) {
@@ -77,25 +90,43 @@
     return s.enabled !== false && s.enabled !== 0 && s.enabled !== "0";
   }
 
-  function render(slots) {
-    var rows = topSlots(slots);
+  function layoutKey(rows) {
+    return rows.map(function (s) {
+      return [s.id, s.label || "", s.media_kind || "", isOn(s) ? "1" : "0"].join("\t");
+    }).join("\n");
+  }
+
+  function paintLive(rows) {
+    rows.forEach(function (s) {
+      var row = list.querySelector('[data-id="' + s.id + '"]');
+      if (!row) return;
+      row.classList.toggle("on", !!s.visible);
+      var live = row.querySelector(".live");
+      if (live) live.setAttribute("title", s.visible ? "live" : "idle");
+    });
+  }
+
+  function render(rows) {
     empty.hidden = rows.length > 0;
     list.innerHTML = "";
     rows.forEach(function (s) {
       var row = document.createElement("div");
-      row.className = "row" + (isOn(s) ? "" : " off") + (s.visible ? " on" : "");
+      var on = isOn(s);
+      row.className = "row" + (on ? "" : " off") + (s.visible ? " on" : "");
       row.dataset.id = s.id;
       row.innerHTML =
-        '<span class="live" title="' + (s.visible ? "live" : "off") + '"></span>' +
+        '<span class="kind" title="' + (s.media_kind || "text") + '">' + icon(kindIcon(s)) + "</span>" +
+        '<span class="live" title="' + (s.visible ? "live" : "idle") + '">LIVE</span>' +
         '<span class="who"><span class="label"></span><span class="id"></span></span>' +
         '<span class="acts">' +
-        '<button type="button" data-act="fire">Fire</button>' +
-        '<button type="button" data-act="hide">Hide</button>' +
-        '<button type="button" data-act="copy-fire">Copy fire URL</button>' +
-        '<button type="button" data-act="copy-hide">Copy hide URL</button>' +
+        '<button type="button" class="btn-fire" data-act="fire">' + icon("player-play") + " Fire</button>" +
+        '<button type="button" data-act="hide">' + icon("eye-off") + " Hide</button>" +
+        '<button type="button" class="icon-btn" data-act="copy-fire" title="Copy fire URL" aria-label="Copy fire URL">' + icon("link") + "</button>" +
+        '<button type="button" class="icon-btn" data-act="copy-hide" title="Copy hide URL" aria-label="Copy hide URL">' + icon("copy") + "</button>" +
         "</span>";
       row.querySelector(".label").textContent = s.label || s.id;
       row.querySelector(".id").textContent = s.id;
+      if (!on) row.title = "Disabled — fire is 404 until the composer eye is on";
       list.appendChild(row);
     });
   }
@@ -106,7 +137,14 @@
       downBanner.hidden = true;
       return r.json();
     }).then(function (s) {
-      render(s.slots);
+      var rows = topSlots(s.slots);
+      var key = layoutKey(rows);
+      if (key !== lastKey) {
+        lastKey = key;
+        render(rows);
+      } else {
+        paintLive(rows);
+      }
     }).catch(function () {
       downBanner.hidden = false;
     });
@@ -136,11 +174,11 @@
       return;
     }
     if (act === "copy-fire") {
-      copyText(popupURL(id)).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
+      copyText(popupURL(id)).then(function () { setStatus("Copied fire URL"); }).catch(function () { setStatus("Copy failed"); });
       return;
     }
     if (act === "copy-hide") {
-      copyText(hideURL(id)).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });
+      copyText(hideURL(id)).then(function () { setStatus("Copied hide URL"); }).catch(function () { setStatus("Copy failed"); });
     }
   });
 

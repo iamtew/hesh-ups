@@ -11,12 +11,27 @@
       <div id="down-msg" role="status">Error: hesh-ups application not running!</div>
     </div>
     <header id="bar">
-      <span class="bar-brand">Board</span>
+      <div class="bar-brand-wrap">
+        <img src="/composer/favicon.png" alt="" />
+        <span class="bar-brand">hesh-ups</span>
+        <span class="win-title">
+          <svg class="icon" aria-hidden="true"><use href="/composer/icons.svg#tabler-player-play"></use></svg>
+          Board
+        </span>
+      </div>
       <span id="bar-status" role="status"></span>
-      <button type="button" id="btn-hide-all">Hide all</button>
+      <button type="button" id="btn-hide-all">
+        <svg class="icon" aria-hidden="true"><use href="/composer/icons.svg#tabler-eye-off"></use></svg>
+        Hide all
+      </button>
     </header>
-    <main id="list" aria-label="Slots"></main>
-    <p id="empty" hidden>No fireable slots</p>
+    <div id="desk">
+      <main id="list" aria-label="Slots"></main>
+      <p id="empty" hidden>
+        <svg class="icon" aria-hidden="true"><use href="/composer/icons.svg#tabler-stack-2"></use></svg>
+        No fireable slots. Add them in the composer.
+      </p>
+    </div>
     <script src="app.js"></script>
   </body>
 </html>

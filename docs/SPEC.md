@@ -446,7 +446,7 @@ Overlay page: vanilla `web/overlay/index.html` (+ css/js). No frameworks. Transp
 
 ## Board
 
-Page `/board/`. Files: `web/board/index.html`, `style.css`, `app.js`. Vanilla. Compact list, not the composer plot. No Pixi, no settings, no scene picker. WebView ~560×720.
+Page `/board/`. Files: `web/board/index.html`, `style.css`, `app.js`. Vanilla. Compact list, not the composer plot. No Pixi, no settings, no scene picker. Tabler icons from `/composer/icons.svg`. WebView ~640×760.
 
 List **top-level** slots only (a group is one row; members are not fireable). Disabled slots stay on the list, dimmed; Fire still 404s.
 
@@ -551,7 +551,7 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray notification glyph. Exe PE icon is `rsrc_windows_amd64.syso`. Menu items set Tabler `.ico` from `cmd/hesh-ups/icons/` via `MenuItem.SetIcon`. Overlay page has no chrome icons.
 
-- **Board** ▸ **Open window** — WebView `http://127.0.0.1:{port}/board/` (~560×720); **Open in browser** — same URL in the system browser
+- **Board** ▸ **Open window** — WebView `http://127.0.0.1:{port}/board/` (~640×760); **Open in browser** — same URL in the system browser
 - **Composer** ▸ **Open window** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800); **Open in browser** — same URL in the system browser
 - **Overlay preview** ▸ **Open window** — WebView `/overlay/` (1280×720 unless canvas fits); **Open in browser** — same URL in the system browser
 - **OBS: connected** / **OBS: disconnected** — label
