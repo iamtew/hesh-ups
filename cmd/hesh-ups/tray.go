@@ -51,18 +51,18 @@ func onReady(s *Server) {
 	}
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
-	mTriggers := systray.AddMenuItem("Triggers", "Open triggers")
-	setMenuIcon(mTriggers, "app-window")
-	mTriggersWin := mTriggers.AddSubMenuItem("Open window", "Open triggers WebView")
-	setMenuIcon(mTriggersWin, "app-window")
-	mTriggersWeb := mTriggers.AddSubMenuItem("Open in browser", "Open triggers in browser")
-	setMenuIcon(mTriggersWeb, "world")
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
 	setMenuIcon(mComposer, "layout-board")
 	mComposerWin := mComposer.AddSubMenuItem("Open window", "Open composer WebView")
 	setMenuIcon(mComposerWin, "app-window")
 	mComposerWeb := mComposer.AddSubMenuItem("Open in browser", "Open composer in browser")
 	setMenuIcon(mComposerWeb, "world")
+	mTriggers := systray.AddMenuItem("Triggers", "Open triggers")
+	setMenuIcon(mTriggers, "app-window")
+	mTriggersWin := mTriggers.AddSubMenuItem("Open window", "Open triggers WebView")
+	setMenuIcon(mTriggersWin, "app-window")
+	mTriggersWeb := mTriggers.AddSubMenuItem("Open in browser", "Open triggers in browser")
+	setMenuIcon(mTriggersWeb, "world")
 	mOverlay := systray.AddMenuItem("Overlay preview", "Open overlay")
 	setMenuIcon(mOverlay, "stack-2")
 	mOverlayWin := mOverlay.AddSubMenuItem("Open window", "Open overlay WebView")
@@ -105,14 +105,14 @@ func onReady(s *Server) {
 	go func() {
 		for {
 			select {
-			case <-mTriggersWin.ClickedCh:
-				go openView("Triggers", base+"/triggers/", 640, 760)
-			case <-mTriggersWeb.ClickedCh:
-				openBrowser(base + "/triggers/")
 			case <-mComposerWin.ClickedCh:
 				go openView("Composer", base+"/composer/", 1280, 800)
 			case <-mComposerWeb.ClickedCh:
 				openBrowser(base + "/composer/")
+			case <-mTriggersWin.ClickedCh:
+				go openView("Triggers", base+"/triggers/", 640, 760)
+			case <-mTriggersWeb.ClickedCh:
+				openBrowser(base + "/triggers/")
 			case <-mOverlayWin.ClickedCh:
 				go openView("Overlay", base+"/overlay/", 1280, 720)
 			case <-mOverlayWeb.ClickedCh:

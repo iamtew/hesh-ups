@@ -49,7 +49,7 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 
 | Surface | What |
 | --- | --- |
-| Systray | Exit; triggers, composer, and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
+| Systray | Exit; composer, triggers, and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
 | Composer | `GET /composer/` — plot stage + OBS. Same embed. |
 | Triggers | `GET /triggers/` — fire/hide/copy-URL list of top-level slots. Same embed. `/board/` 301s here. |
@@ -551,8 +551,8 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray notification glyph. Exe PE icon is `rsrc_windows_amd64.syso`. Menu items set Tabler `.ico` from `cmd/hesh-ups/icons/` via `MenuItem.SetIcon`. Overlay page has no chrome icons.
 
-- **Triggers** ▸ **Open window** — WebView `http://127.0.0.1:{port}/triggers/` (~640×760); **Open in browser** — same URL in the system browser
 - **Composer** ▸ **Open window** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800); **Open in browser** — same URL in the system browser
+- **Triggers** ▸ **Open window** — WebView `http://127.0.0.1:{port}/triggers/` (~640×760); **Open in browser** — same URL in the system browser
 - **Overlay preview** ▸ **Open window** — WebView `/overlay/` (1280×720 unless canvas fits); **Open in browser** — same URL in the system browser
 - **OBS: connected** / **OBS: disconnected** — label
 - **Run at login** — checkable; same as settings `autostart`
