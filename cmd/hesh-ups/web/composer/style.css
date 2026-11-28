@@ -8,8 +8,8 @@ body.admin {
   --line: #4a4a4a;
   --text: #e6e6e6;
   --muted: #9a9a9a;
-  --accent: #00ffff;
-  --accent2: #88f25d;
+  --accent: #008080;
+  --accent2: #7f7f00;
   --r: 3px;
   display: flex;
   background: var(--shell);
@@ -115,7 +115,7 @@ body.admin input[type="checkbox"] { width: auto; }
 #layer-list .row {
   display: flex; align-items: center; gap: 6px; padding: 6px 8px; cursor: pointer;
 }
-#layer-list li.group > .row { background: rgba(0, 255, 255, 0.08); }
+#layer-list li.group > .row { background: rgba(0, 128, 128, 0.08); }
 #layer-list li.group.host > .row { outline: 1px dashed var(--accent); }
 #layer-list ul.members {
   list-style: none; margin: 0 0 4px 14px; padding: 0;
@@ -139,9 +139,9 @@ body.admin input[type="checkbox"] { width: auto; }
   display: block; width: 100%; margin: 0 0 8px; padding: 8px 10px;
   font: 700 11px/1.2 Segoe UI, sans-serif; letter-spacing: 0.08em; text-transform: uppercase;
   text-align: left; color: var(--accent);
-  border: 1px solid var(--accent); background: rgba(0, 255, 255, 0.08);
+  border: 1px solid var(--accent); background: rgba(0, 128, 128, 0.08);
 }
-#inspector button.where.member { color: var(--accent2); border-color: var(--accent2); background: rgba(136, 242, 93, 0.08); }
+#inspector button.where.member { color: var(--accent2); border-color: var(--accent2); background: rgba(127, 127, 0, 0.08); }
 #f-members { margin: 4px 0 0; padding: 0 0 0 1.1em; font-size: 12px; color: var(--text); }
 #layer-list button { width: auto; padding: 4px; }
 .win-body { flex: 1; min-height: 0; overflow: auto; padding: 8px 10px 16px; }
@@ -175,7 +175,7 @@ body.admin input[type="checkbox"] { width: auto; }
   outline: 1px dashed rgba(230, 230, 230, 0.4);
   background: rgba(255, 255, 255, 0.04);
 }
-.box.sel { outline: 1px solid rgba(0, 255, 255, 0.45); }
+.box.sel { outline: 1px solid rgba(0, 128, 128, 0.45); }
 .box img, .box video, .box .banner-content {
   width: 100%;
   height: 100%;
@@ -184,13 +184,13 @@ body.admin input[type="checkbox"] { width: auto; }
 }
 .box.group {
   overflow: hidden;
-  background: rgba(0, 255, 255, 0.08);
+  background: rgba(0, 128, 128, 0.08);
   outline: 2px dashed var(--accent);
 }
-.box.group.host, .box.group.sel { background: rgba(0, 255, 255, 0.16); }
+.box.group.host, .box.group.sel { background: rgba(0, 128, 128, 0.16); }
 .box.child {
   outline: 1px dashed var(--accent2);
-  background: rgba(136, 242, 93, 0.06);
+  background: rgba(127, 127, 0, 0.06);
 }
 .box.child.sel { outline: 1px solid var(--accent); }
 .chrome-tag {

@@ -8,4 +8,4 @@ alwaysApply: false
 
 No npm, no bundler, no interact.js. Pointer events in `app.js`.
 
-Composer uses house designer chrome (`body.admin` tokens, file menu, settings modal). Cyan selection. Settings vs tools stay split: OBS/autostart in the modal, slot fields in the inspector. Inspector shows only the knobs for the slot’s kind. `PUT /api/slots/{id}` on pointerup, not per mousemove. Overlay is transparent; motion CSS (~200ms fade/slide/scale). Text banners use embedded `/shared/` themes + look.js + vendored Pixi (no npm, no disk skins).
+Composer uses house designer chrome (`body.admin` tokens, file menu, settings modal). Teal selection. Settings vs tools stay split: OBS/autostart in the modal, slot fields in the inspector. Inspector shows only the knobs for the slot’s kind. `PUT /api/slots/{id}` on pointerup, not per mousemove. Overlay is transparent; motion CSS (~200ms fade/slide/scale). Text banners use embedded `/shared/` themes + look.js + vendored Pixi (no npm, no disk skins).

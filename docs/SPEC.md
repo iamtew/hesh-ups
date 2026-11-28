@@ -23,7 +23,7 @@ hesh-ups is a **named, laid-out overlay**. Streamer.bot (or anything that can hi
 
 | Who | Job |
 | --- | --- |
-| Operator | Lay out a 1080 (or custom) overlay once in the composer **plot**: drag named boxes, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. Boxes are outlines until selected (**preview**, sample fill) or fired (**program**, green live mark). |
+| Operator | Lay out a 1080 (or custom) overlay once in the composer **plot**: drag named boxes, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. Boxes are outlines until selected (**preview**, sample fill) or fired (**program**, olive live mark). |
 | Operator | Open tray **Triggers** to fire/stop every top-level slot and copy its trigger URLs into Streamer.bot / Stream Deck HTTP / a browser. Group members are not fireable. |
 | Operator | Open tray **Overlay preview** to see the same transparent page OBS shows (program only — empty until fire). |
 | Operator | Test-fire a slot from the composer (same URL as production), including sample `{user}` text. |
@@ -410,13 +410,25 @@ Overlay DOM: one node per **top-level** slot, class `slot popup`, positioned wit
 
 ---
 
+## Brand
+
+Logo and house chrome. Overlay text themes keep their own palettes.
+
+| Name | Hex | Job |
+| --- | --- | --- |
+| teal | `#008080` | Main. Selection, links, buttons, group chrome. CSS `--accent`. |
+| olive | `#7f7f00` | Accent. Live mark, connected pill, group members. CSS `--accent2`. |
+| platinum | `#d4d8dc` | Details. Pages body text and hairlines. Not admin `--muted` (`#9a9a9a` stays readable on `#282828`). |
+
+---
+
 ## Composer
 
 Page `/composer/`. Files: `web/composer/index.html`, `style.css`, `app.js`, plus `/shared/` (banner + themes + Pixi). Vanilla. **No npm, no bundler, no interact.js.** Pointer events in `app.js`.
 
-Look: **house designer chrome** (same as Border Studio / Show Credits), not a website. Cyan selection (`#00ffff`), not Border Studio lime.
+Look: **house designer chrome** (same as Border Studio / Show Credits), not a website. Teal selection (`#008080`), olive live/members (`#7f7f00`).
 
-- Tokens on `body.admin`: `--shell #282828`, `--panel #222`, `--lift #3b3b3b`, `--line #4a4a4a`, `--text #e6e6e6`, `--muted #9a9a9a`, `--accent #00ffff`, `--accent2 #88f25d`, `--r 3px`.
+- Tokens on `body.admin`: `--shell #282828`, `--panel #222`, `--lift #3b3b3b`, `--line #4a4a4a`, `--text #e6e6e6`, `--muted #9a9a9a`, `--accent #008080`, `--accent2 #7f7f00`, `--r 3px`.
 - Segoe UI. `color-scheme: dark`. Full viewport, `overflow: hidden` on `body`. WebView opens large (~1280×800).
 
 ### Chrome (three panes + top bar)
@@ -426,13 +438,13 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 [ layers | canvas (flex) | inspector ]
 ```
 
-**Top bar:** brand **file menu** (Settings, Help → `POST /api/help`, Close → `POST /api/view/close`, Quit, version); canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — composer-only, not drawn in OBS); Snap (default on); copy overlay URL; **Stop all**; OBS scene `<select>` + Switch; OBS pill (red/green dot). Pill click opens Settings on OBS. Status line for copy/fire/stop/errors.
+**Top bar:** brand **file menu** (Settings, Help → `POST /api/help`, Close → `POST /api/view/close`, Quit, version); canvas 720p / 1080p (writes `canvas_w/h`); grid toggles (thirds, center, safe — composer-only, not drawn in OBS); Snap (default on); copy overlay URL; **Stop all**; OBS scene `<select>` + Switch; OBS pill (red down / olive up). Pill click opens Settings on OBS. Status line for copy/fire/stop/errors.
 
 **Settings** is a blur modal with left nav, not a workspace tab. **OBS:** host, port, password, Browser Source name, status, create/update Browser Source. Save on close (`PUT /api/settings`); writing `obs_*` kicks the websocket so a new password is used immediately. **App:** Run at login, fire token. No Connect/Disconnect UI — background reconnect.
 
 **Layers (left ~240px):** slot list, front = high `z`. Groups nest members in the list. Click selects. Eye toggles `enabled`: off hides the box on the composer stage (a group hides its members) and fire is 404. **+** adds a top-level **text** slot (`id` `slot-n`, `theme` `plain`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`; group deletes children). Empty canvas: one hint, no fake sample slot. No jb2 visualizers. Text themes are the embedded banner set, not disk skins.
 
-**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **Plot**, not program: enabled slots are dashed named boxes. **Select** fills that slot (a group fills its members) with overlay content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). **Live** (`visible`, Test or HTTP) fills the same way plus the green live mark. Grid, cyan handles, layer names, group fill/tags (`GROUP` / `IN {group}`), and inspector group banner are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page (program only). Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
+**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **Plot**, not program: enabled slots are dashed named boxes. **Select** fills that slot (a group fills its members) with overlay content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). **Live** (`visible`, Test or HTTP) fills the same way plus the olive live mark. Grid, teal handles, layer names, group fill/tags (`GROUP` / `IN {group}`), and inspector group banner are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page (program only). Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: teal outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
 **Inspector (right ~280px):** slot only — id, **label**, x y w h z (x/y and w/h share a two-column row; typing updates the box live; **`PUT` on change/blur** / pointerup). **type** first (`text` / `image` / `gif` / `video` / `audio` / `group`). Only knobs for that kind: text → template + theme; image/gif → file; video/audio → file + playback + volume; group → member list + Add member. Duration on the fireable slot (not on children). Assigning a video, audio, or gif file sets `duration_ms` to that file’s length. **Reset** restores that length, or 5000 for text, image, and group. **Save** / **Test** / **Stop** / copy trigger URL / **Duplicate** (top-level) / Trash sit in a strip pinned to the bottom of the pane while fields scroll (Ctrl+S / Cmd+S also Save). Test / Stop / copy URL use the group id for members. Text slots also get size, weight, fill, stroke, align, and fit. Fireable slots get motion. Text template field scrolls inside itself past a short max height. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 

@@ -342,7 +342,7 @@
       (document.getElementById("grid-center").checked ? "center," : "") +
       (document.getElementById("grid-safe").checked ? "safe" : "");
     function line(x1, y1, x2, y2) {
-      lines.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="rgba(0,255,255,0.45)" stroke-width="2"/>');
+      lines.push('<line x1="' + x1 + '" y1="' + y1 + '" x2="' + x2 + '" y2="' + y2 + '" stroke="rgba(0,128,128,0.45)" stroke-width="2"/>');
     }
     if (flags.indexOf("thirds") >= 0) {
       line(w / 3, 0, w / 3, h); line((2 * w) / 3, 0, (2 * w) / 3, h);
@@ -353,7 +353,7 @@
     }
     if (flags.indexOf("safe") >= 0) {
       var m = Math.round(h * 0.05);
-      lines.push('<rect x="' + m + '" y="' + m + '" width="' + (w - 2 * m) + '" height="' + (h - 2 * m) + '" fill="none" stroke="rgba(0,255,255,0.45)"/>');
+      lines.push('<rect x="' + m + '" y="' + m + '" width="' + (w - 2 * m) + '" height="' + (h - 2 * m) + '" fill="none" stroke="rgba(0,128,128,0.45)"/>');
     }
     grid.innerHTML = lines.join("");
   }

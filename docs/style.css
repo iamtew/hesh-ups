@@ -1,10 +1,11 @@
 :root {
   --page-bg: #111;
   --panel-bg: #171717;
-  --border: rgba(255, 255, 255, 0.08);
-  --text: #eee;
-  --muted: #99aab5;
-  --cyan: #0ff;
+  --border: rgba(212, 216, 220, 0.12);
+  --text: #d4d8dc;
+  --muted: #9aa3ab;
+  --accent: #008080;
+  --accent2: #7f7f00;
   color-scheme: dark;
 }
 
@@ -18,7 +19,7 @@ html, body {
   font-family: system-ui, sans-serif;
 }
 
-a { color: var(--cyan); }
+a { color: var(--accent); }
 
 .icon {
   width: 1em;
@@ -39,8 +40,8 @@ a { color: var(--cyan); }
   gap: 0.35rem;
   margin-right: 1rem;
   padding: 0.4rem 0.8rem;
-  background: var(--cyan);
-  color: #111;
+  background: var(--accent);
+  color: var(--text);
   text-decoration: none;
 }
 
@@ -64,7 +65,7 @@ a { color: var(--cyan); }
   border-right: 1px solid var(--border);
 }
 .nav a { display: flex; align-items: center; gap: 0.4rem; padding: 0.25rem 0; color: var(--text); text-decoration: none; }
-.nav a[aria-current="page"] { color: var(--cyan); }
+.nav a[aria-current="page"] { color: var(--accent); }
 .nav-group { color: var(--muted); font-size: 0.75rem; text-transform: uppercase; margin: 1rem 0 0.25rem; }
 .doc { flex: 1; padding: 1.5rem 2rem; max-width: 48rem; }
 .doc img { max-width: 100%; }
