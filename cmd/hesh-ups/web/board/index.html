@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>hesh-ups board</title>
+    <link rel="icon" type="image/png" href="/composer/favicon.png" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body class="admin">
+    <div id="down-banner" hidden>
+      <div id="down-msg" role="status">Error: hesh-ups application not running!</div>
+    </div>
+    <header id="bar">
+      <span class="bar-brand">Board</span>
+      <span id="bar-status" role="status"></span>
+      <button type="button" id="btn-hide-all">Hide all</button>
+    </header>
+    <main id="list" aria-label="Slots"></main>
+    <p id="empty" hidden>No fireable slots</p>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -782,6 +782,33 @@ func TestSharedBanner(t *testing.T) {
 	}
 }
 
+func TestBoardPage(t *testing.T) {
+	_, ts := testSrv(t)
+	res, err := http.Get(ts.URL + "/board/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatal(res.StatusCode)
+	}
+	b, _ := io.ReadAll(res.Body)
+	if !strings.Contains(string(b), "hesh-ups board") {
+		t.Fatal("missing board html")
+	}
+	c := &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	redir, err := c.Get(ts.URL + "/board")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer redir.Body.Close()
+	if redir.StatusCode != http.StatusMovedPermanently {
+		t.Fatal(redir.StatusCode)
+	}
+}
+
 func TestExclusiveKinds(t *testing.T) {
 	_, ts := testSrv(t)
 	res, _ := doJSON(t, "PUT", ts.URL+"/api/slots/bad", map[string]any{
