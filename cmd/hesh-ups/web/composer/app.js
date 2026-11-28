@@ -500,7 +500,7 @@
       var row = document.createElement("div");
       row.className = "row";
       var on = isOn(s);
-      row.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="' + (on ? "hide" : "show") + '">' + icon(on ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
+      row.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="' + (on ? "disable" : "enable") + '">' + icon(on ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
       row.querySelector("span").textContent = s.label || s.id;
       row.addEventListener("click", function (e) {
         if (e.target.closest("[data-eye]")) {
@@ -619,7 +619,7 @@
     }
     if (!child) {
       html += '<label>duration_ms <input id="f-dur" type="number" min="0" placeholder="blank = sticky" value="' + (s.duration_ms == null ? "" : s.duration_ms) + '"></label>';
-      html += '<p class="muted">Blank duration stays on until Hide. Default for new slots is 5000.</p>';
+      html += '<p class="muted">Blank duration stays on until Stop. Default for new slots is 5000.</p>';
     }
     if (kind === "group") {
       html += '<p class="muted">Members</p><ul id="f-members">';
@@ -634,7 +634,7 @@
     var actions = '<div class="row">' +
       '<button type="button" id="f-save">' + icon("device-floppy") + " Save</button>" +
       '<button type="button" id="f-test">' + icon("player-play") + " Test</button>" +
-      '<button type="button" id="f-hide">' + icon("eye-off") + " Hide</button></div>" +
+      '<button type="button" id="f-stop">' + icon("x") + " Stop</button></div>" +
       '<div class="row">';
     if (!child) {
       actions += '<button type="button" id="f-copy" title="Copy trigger URL">' + icon("link") + " Copy URL</button>";
@@ -818,22 +818,22 @@
           paintSlotTree(fs);
         }
         var sticky = (fired.duration_ms == null || fired.duration_ms <= 0) && fired.media_kind !== "video" && fired.media_kind !== "audio" && fired.media_kind !== "group";
-        setStatus(sticky ? "Fired (sticky — Hide to stop)" : "Fired " + fid);
+        setStatus(sticky ? "Fired (sticky — Stop to end)" : "Fired " + fid);
       }).catch(function (err) {
         if (!err || !err.save) setStatus("Fire failed");
       });
     }
-    if (id === "f-hide") {
-      fetch(origin() + "/api/popup/" + encodeURIComponent(fireId(s)) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
+    if (id === "f-stop") {
+      fetch(origin() + "/api/popup/" + encodeURIComponent(fireId(s)) + "/stop" + tokenQuery(), { method: "POST" }).then(function (r) {
         if (r.ok) {
           var hid = slotById(fireId(s));
           if (hid) {
             hid.visible = false;
             paintSlotTree(hid);
           }
-          setStatus("Hidden " + fireId(s));
+          setStatus("Stopped " + fireId(s));
         } else errMsg(r).then(setStatus);
-      }).catch(function () { setStatus("Hide failed"); });
+      }).catch(function () { setStatus("Stop failed"); });
     }
     if (id === "f-copy") {
       copyText(popupURL(fireId(s))).then(function () { setStatus("Copied"); }).catch(function () { setStatus("Copy failed"); });

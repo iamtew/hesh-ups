@@ -59,7 +59,7 @@
         show(msg);
         return;
       }
-      if (msg.type === "hide") {
+      if (msg.type === "stop") {
         hide(msg.slot);
         return;
       }

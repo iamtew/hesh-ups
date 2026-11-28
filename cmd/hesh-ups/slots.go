@@ -251,8 +251,8 @@ func (s *Server) hide(id string, reason string) {
 	}
 	s.mu.Unlock()
 	_, _ = s.db.Exec(`DELETE FROM visible WHERE slot_id=?`, id)
-	s.logEvent("hide", id, reason, "ok")
-	s.hub.broadcast(map[string]any{"type": "hide", "slot": id})
+	s.logEvent("stop", id, reason, "ok")
+	s.hub.broadcast(map[string]any{"type": "stop", "slot": id})
 }
 
 func (s *Server) stopAll() {

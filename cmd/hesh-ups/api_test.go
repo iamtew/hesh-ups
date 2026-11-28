@@ -182,7 +182,7 @@ func TestR3Fire(t *testing.T) {
 	}
 }
 
-func TestR4Hide(t *testing.T) {
+func TestR4Stop(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
 	c := wsDial(t, ts)
@@ -190,14 +190,14 @@ func TestR4Hide(t *testing.T) {
 	readType(t, c, "snapshot", 2*time.Second)
 	doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
 	readType(t, c, "show", 2*time.Second)
-	doJSON(t, "POST", ts.URL+"/api/popup/logo/hide", nil)
-	hide := readType(t, c, "hide", 2*time.Second)
-	if hide["slot"] != "logo" {
-		t.Fatal(hide)
+	doJSON(t, "POST", ts.URL+"/api/popup/logo/stop", nil)
+	stop := readType(t, c, "stop", 2*time.Second)
+	if stop["slot"] != "logo" {
+		t.Fatal(stop)
 	}
 	var st map[string]any
 	getJSON(t, ts, "/api/state", &st)
-	if st["events"].([]any)[0].(map[string]any)["action"] != "hide" {
+	if st["events"].([]any)[0].(map[string]any)["action"] != "stop" {
 		t.Fatal(st["events"])
 	}
 }
@@ -220,7 +220,7 @@ func TestHubConcurrentWrites(t *testing.T) {
 		}
 		for i := 0; i < 30; i++ {
 			post("/api/popup/logo")
-			post("/api/popup/logo/hide")
+			post("/api/popup/logo/stop")
 		}
 		close(done)
 	}()
@@ -230,9 +230,9 @@ func TestHubConcurrentWrites(t *testing.T) {
 		}
 	}()
 	<-done
-	sawShow, sawHide, sawPong := false, false, false
+	sawShow, sawStop, sawPong := false, false, false
 	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) && (!sawShow || !sawHide) {
+	for time.Now().Before(deadline) && (!sawShow || !sawStop) {
 		ctx, cancel := context.WithDeadline(context.Background(), deadline)
 		_, data, err := c.Read(ctx)
 		cancel()
@@ -246,18 +246,18 @@ func TestHubConcurrentWrites(t *testing.T) {
 		switch m["type"] {
 		case "show":
 			sawShow = true
-		case "hide":
-			sawHide = true
+		case "stop":
+			sawStop = true
 		case "pong":
 			sawPong = true
 		}
 	}
-	if !sawShow || !sawHide {
-		t.Fatalf("show=%v hide=%v pong=%v", sawShow, sawHide, sawPong)
+	if !sawShow || !sawStop {
+		t.Fatalf("show=%v stop=%v pong=%v", sawShow, sawStop, sawPong)
 	}
 }
 
-func TestR5HideAll(t *testing.T) {
+func TestR5StopAll(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)
 	doJSON(t, "PUT", ts.URL+"/api/slots/a", map[string]any{
@@ -530,7 +530,7 @@ func TestR17Ended(t *testing.T) {
 	show := readType(t, c, "show", 2*time.Second)
 	seq := int(show["seq"].(float64))
 	_ = c.Write(context.Background(), websocket.MessageText, []byte(`{"type":"ended","slot":"clip","seq":`+itoa(seq)+`}`))
-	readType(t, c, "hide", 2*time.Second)
+	readType(t, c, "stop", 2*time.Second)
 
 	doJSON(t, "POST", ts.URL+"/api/popup/clip", nil)
 	show = readType(t, c, "show", 2*time.Second)
@@ -925,10 +925,10 @@ func TestGroupFire(t *testing.T) {
 	if m0["text"] != "Hi Ada" || m0["theme"] != "lcd-glass" {
 		t.Fatal(m0)
 	}
-	doJSON(t, "POST", ts.URL+"/api/popup/raid/hide", nil)
-	hide := readType(t, c, "hide", 2*time.Second)
-	if hide["slot"] != "raid" {
-		t.Fatal(hide)
+	doJSON(t, "POST", ts.URL+"/api/popup/raid/stop", nil)
+	stop := readType(t, c, "stop", 2*time.Second)
+	if stop["slot"] != "raid" {
+		t.Fatal(stop)
 	}
 }
 

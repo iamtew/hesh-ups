@@ -41,8 +41,8 @@
     return origin() + "/api/popup/" + encodeURIComponent(id) + q;
   }
 
-  function hideURL(id) {
-    return origin() + "/api/popup/" + encodeURIComponent(id) + "/hide" + tokenQuery();
+  function stopURL(id) {
+    return origin() + "/api/popup/" + encodeURIComponent(id) + "/stop" + tokenQuery();
   }
 
   function copyText(text) {
@@ -96,28 +96,6 @@
     }).join("\n");
   }
 
-  function toggleHtml(live) {
-    return live ? icon("eye-off") + " Hide" : icon("eye") + " Show";
-  }
-
-  function setToggle(row, live) {
-    var btn = row.querySelector('[data-act="toggle"]');
-    if (!btn) return;
-    btn.innerHTML = toggleHtml(live);
-    btn.setAttribute("aria-pressed", live ? "true" : "false");
-  }
-
-  function anyLive(rows) {
-    return rows.some(function (s) { return !!s.visible; });
-  }
-
-  function setAllBtn(live) {
-    var btn = document.getElementById("btn-stop-all");
-    btn.innerHTML = live ? icon("x") + " Stop all" : icon("eye") + " Show all";
-    btn.setAttribute("aria-pressed", live ? "true" : "false");
-    btn.dataset.mode = live ? "stop" : "show";
-  }
-
   function paintLive(rows) {
     rows.forEach(function (s) {
       var row = list.querySelector('[data-id="' + s.id + '"]');
@@ -125,9 +103,7 @@
       row.classList.toggle("on", !!s.visible);
       var live = row.querySelector(".live");
       if (live) live.setAttribute("title", s.visible ? "live" : "idle");
-      setToggle(row, !!s.visible);
     });
-    setAllBtn(anyLive(rows));
   }
 
   function render(rows) {
@@ -144,16 +120,15 @@
         '<span class="who"><span class="label"></span><span class="id"></span></span>' +
         '<span class="acts">' +
         '<button type="button" class="btn-fire" data-act="fire">' + icon("player-play") + " Fire</button>" +
-        '<button type="button" data-act="toggle" aria-pressed="' + (s.visible ? "true" : "false") + '">' + toggleHtml(!!s.visible) + "</button>" +
+        '<button type="button" data-act="stop">' + icon("x") + " Stop</button>" +
         '<button type="button" class="icon-btn" data-act="copy-fire" title="Copy fire URL" aria-label="Copy fire URL">' + icon("link") + "</button>" +
-        '<button type="button" class="icon-btn" data-act="copy-hide" title="Copy hide URL" aria-label="Copy hide URL">' + icon("copy") + "</button>" +
+        '<button type="button" class="icon-btn" data-act="copy-stop" title="Copy stop URL" aria-label="Copy stop URL">' + icon("copy") + "</button>" +
         "</span>";
       row.querySelector(".label").textContent = s.label || s.id;
       row.querySelector(".id").textContent = s.id;
       if (!on) row.title = "Disabled — fire is 404 until the composer eye is on";
       list.appendChild(row);
     });
-    setAllBtn(anyLive(rows));
   }
 
   function load() {
@@ -182,7 +157,7 @@
     if (!row) return;
     var id = row.dataset.id;
     var act = btn.getAttribute("data-act");
-    if (act === "fire" || (act === "toggle" && !row.classList.contains("on"))) {
+    if (act === "fire") {
       fetch(popupURL(id, "user=Ada"), { method: "POST" }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
         setStatus("Fired " + id);
@@ -190,38 +165,37 @@
       }).catch(function () { setStatus("Fire failed"); });
       return;
     }
-    if (act === "toggle") {
-      fetch(origin() + "/api/popup/" + encodeURIComponent(id) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
+    if (act === "stop") {
+      fetch(stopURL(id), { method: "POST" }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
-        setStatus("Hidden " + id);
+        setStatus("Stopped " + id);
         return load();
-      }).catch(function () { setStatus("Hide failed"); });
+      }).catch(function () { setStatus("Stop failed"); });
       return;
     }
     if (act === "copy-fire") {
       copyText(popupURL(id)).then(function () { setStatus("Copied fire URL"); }).catch(function () { setStatus("Copy failed"); });
       return;
     }
-    if (act === "copy-hide") {
-      copyText(hideURL(id)).then(function () { setStatus("Copied hide URL"); }).catch(function () { setStatus("Copy failed"); });
+    if (act === "copy-stop") {
+      copyText(stopURL(id)).then(function () { setStatus("Copied stop URL"); }).catch(function () { setStatus("Copy failed"); });
     }
   });
 
+  document.getElementById("btn-fire-all").addEventListener("click", function () {
+    var ids = [];
+    list.querySelectorAll(".row:not(.off)").forEach(function (row) {
+      ids.push(row.dataset.id);
+    });
+    Promise.all(ids.map(function (id) {
+      return fetch(popupURL(id, "user=Ada"), { method: "POST" });
+    })).then(function () {
+      setStatus(ids.length ? "Fired all" : "Nothing to fire");
+      return load();
+    }).catch(function () { setStatus("Fire all failed"); });
+  });
+
   document.getElementById("btn-stop-all").addEventListener("click", function () {
-    var btn = document.getElementById("btn-stop-all");
-    if (btn.dataset.mode === "show") {
-      var ids = [];
-      list.querySelectorAll(".row:not(.off)").forEach(function (row) {
-        ids.push(row.dataset.id);
-      });
-      Promise.all(ids.map(function (id) {
-        return fetch(popupURL(id, "user=Ada"), { method: "POST" });
-      })).then(function () {
-        setStatus(ids.length ? "Fired all" : "Nothing to show");
-        return load();
-      }).catch(function () { setStatus("Show all failed"); });
-      return;
-    }
     fetch(origin() + "/api/popup/stop_all" + tokenQuery(), { method: "POST" }).then(function (r) {
       if (!r.ok) return errMsg(r).then(setStatus);
       setStatus("Stopped all");

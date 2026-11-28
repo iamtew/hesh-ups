@@ -149,7 +149,7 @@ docs/
 | `overview.md` | What it is, jobs, links |
 | `running.md` | Install, tray, Browser Source, OBS audio checkbox |
 | `composer.md` | Slots, templates, playback, Test |
-| `triggers.md` | Fire/hide list, copy trigger URLs |
+| `triggers.md` | Fire/stop list, copy trigger URLs |
 | `overlay.md` | Canvas, overlay page, WebSocket |
 | `http.md` | Trigger URLs, token, hide |
 | `obs.md` | obs-websocket, source setup, scenes |
@@ -221,7 +221,7 @@ This is the **only** overlay/composer/triggers source. Compiled into the exe. No
 | Repo path | HTTP |
 | --- | --- |
 | `cmd/hesh-ups/web/overlay/` | `/overlay/` (`index.html`, `style.css`, `app.js`) |
-| `cmd/hesh-ups/web/triggers/` | `/triggers/` (fire/hide/copy-URL list; `/board/` 301s here) |
+| `cmd/hesh-ups/web/triggers/` | `/triggers/` (fire/stop/copy-URL list; `/board/` 301s here) |
 | `cmd/hesh-ups/web/composer/` | `/composer/` (designer chrome: bar, layers, canvas, inspector, settings modal, `favicon.png`) |
 | `cmd/hesh-ups/web/shared/` | `/shared/` (banner.css, themes, vendored Pixi). Overlay and composer both load these. |
 

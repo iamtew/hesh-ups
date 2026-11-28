@@ -5,7 +5,7 @@ Install the zip or MSI (`hesh-ups.exe` only). First run creates `%APPDATA%\hesh-
 Systray:
 
 - Composer — plot of named boxes (`/composer/`); Open window (WebView) or Open in browser
-- Triggers — fire/hide every top-level slot and copy trigger URLs (`/triggers/`); Open window (WebView) or Open in browser
+- Triggers — fire/stop every top-level slot and copy trigger URLs (`/triggers/`); Open window (WebView) or Open in browser
 - Overlay preview — program (same page OBS loads, empty until fire); Open window or Open in browser
 - OBS connected / disconnected
 - Run at login
