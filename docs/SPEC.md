@@ -450,7 +450,7 @@ Page `/triggers/`. Files: `web/triggers/index.html`, `style.css`, `app.js`. Vani
 
 List **top-level** slots only (a group is one row; members are not fireable). Disabled slots stay on the list, dimmed; Fire still 404s.
 
-Each row: label + id, live mark from `/api/state` `visible`, **Fire**, **Hide**, **Copy fire URL**, **Copy hide URL**. Fire is `POST /api/popup/{id}?user=Ada` plus token query if set (same sample as composer Test). Copied fire URL is `http://127.0.0.1:{port}/api/popup/{id}` with `?token=` only when a token is set — no `user=Ada` on the paste. Hide URL is that path plus `/hide`. Header **Hide all**. Status line for copy/fire/hide/errors. Poll `/api/state` (~2s); load token from `/api/settings`. Composer inspector Test/copy stays.
+Each row: label + id, live mark from `/api/state` `visible`, **Fire**, **Hide/Show** toggle, **Copy fire URL**, **Copy hide URL**. Fire always `POST /api/popup/{id}?user=Ada` (retrigger; same sample as composer Test) plus token query if set. Toggle: live → hide URL, idle → same fire as Fire. Copied fire URL is `http://127.0.0.1:{port}/api/popup/{id}` with `?token=` only when a token is set — no `user=Ada` on the paste. Hide URL is that path plus `/hide`. Header **Hide all**. Status line for copy/fire/hide/errors. Poll `/api/state` (~2s); load token from `/api/settings`. Composer inspector Test/copy stays.
 
 If polling fails, a full-window down banner: application not running.
 

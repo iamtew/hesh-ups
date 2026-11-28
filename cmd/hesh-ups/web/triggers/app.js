@@ -96,6 +96,17 @@
     }).join("\n");
   }
 
+  function toggleHtml(live) {
+    return live ? icon("eye-off") + " Hide" : icon("eye") + " Show";
+  }
+
+  function setToggle(row, live) {
+    var btn = row.querySelector('[data-act="toggle"]');
+    if (!btn) return;
+    btn.innerHTML = toggleHtml(live);
+    btn.setAttribute("aria-pressed", live ? "true" : "false");
+  }
+
   function paintLive(rows) {
     rows.forEach(function (s) {
       var row = list.querySelector('[data-id="' + s.id + '"]');
@@ -103,6 +114,7 @@
       row.classList.toggle("on", !!s.visible);
       var live = row.querySelector(".live");
       if (live) live.setAttribute("title", s.visible ? "live" : "idle");
+      setToggle(row, !!s.visible);
     });
   }
 
@@ -120,7 +132,7 @@
         '<span class="who"><span class="label"></span><span class="id"></span></span>' +
         '<span class="acts">' +
         '<button type="button" class="btn-fire" data-act="fire">' + icon("player-play") + " Fire</button>" +
-        '<button type="button" data-act="hide">' + icon("eye-off") + " Hide</button>" +
+        '<button type="button" data-act="toggle" aria-pressed="' + (s.visible ? "true" : "false") + '">' + toggleHtml(!!s.visible) + "</button>" +
         '<button type="button" class="icon-btn" data-act="copy-fire" title="Copy fire URL" aria-label="Copy fire URL">' + icon("link") + "</button>" +
         '<button type="button" class="icon-btn" data-act="copy-hide" title="Copy hide URL" aria-label="Copy hide URL">' + icon("copy") + "</button>" +
         "</span>";
@@ -157,7 +169,7 @@
     if (!row) return;
     var id = row.dataset.id;
     var act = btn.getAttribute("data-act");
-    if (act === "fire") {
+    if (act === "fire" || (act === "toggle" && !row.classList.contains("on"))) {
       fetch(popupURL(id, "user=Ada"), { method: "POST" }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
         setStatus("Fired " + id);
@@ -165,7 +177,7 @@
       }).catch(function () { setStatus("Fire failed"); });
       return;
     }
-    if (act === "hide") {
+    if (act === "toggle") {
       fetch(origin() + "/api/popup/" + encodeURIComponent(id) + "/hide" + tokenQuery(), { method: "POST" }).then(function (r) {
         if (!r.ok) return errMsg(r).then(setStatus);
         setStatus("Hidden " + id);
