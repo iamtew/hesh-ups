@@ -294,18 +294,36 @@
     return best;
   }
 
-  function placeBox(el, s) {
-    var r = absRect(s);
-    el.style.left = (r.x / state.canvas.w * 100) + "%";
-    el.style.top = (r.y / state.canvas.h * 100) + "%";
-    el.style.width = (r.w / state.canvas.w * 100) + "%";
-    el.style.height = (r.h / state.canvas.h * 100) + "%";
-    var z = s.z || 0;
+  function stageShown(s) {
+    if (!s || !s.enabled) return false;
     if (s.parent_id) {
       var p = slotById(s.parent_id);
-      z = ((p && p.z) || 0) * 100 + z + 1;
+      if (!p || !p.enabled) return false;
     }
-    el.style.zIndex = String(z);
+    return true;
+  }
+
+  function membersOf(id) {
+    return state.slots.filter(function (c) { return c.parent_id === id; }).sort(function (a, b) { return b.z - a.z; });
+  }
+
+  function placeBox(el, s) {
+    if (s.parent_id) {
+      var p = slotById(s.parent_id);
+      var pw = (p && p.w) || 1;
+      var ph = (p && p.h) || 1;
+      el.style.left = (s.x / pw * 100) + "%";
+      el.style.top = (s.y / ph * 100) + "%";
+      el.style.width = (s.w / pw * 100) + "%";
+      el.style.height = (s.h / ph * 100) + "%";
+      el.style.zIndex = String(s.z || 0);
+      return;
+    }
+    el.style.left = (s.x / state.canvas.w * 100) + "%";
+    el.style.top = (s.y / state.canvas.h * 100) + "%";
+    el.style.width = (s.w / state.canvas.w * 100) + "%";
+    el.style.height = (s.h / state.canvas.h * 100) + "%";
+    el.style.zIndex = String(s.z || 0);
   }
 
   function previewText(tmpl) {
@@ -389,7 +407,12 @@
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
     if (el) {
       placeBox(el, s);
-      if (s.media_kind === "text") fillBox(el, s);
+      if (s.media_kind === "group") {
+        membersOf(s.id).forEach(function (c) {
+          var cel = el.querySelector(':scope > .box[data-id="' + c.id + '"]');
+          if (cel) placeBox(cel, c);
+        });
+      } else if (s.media_kind === "text") fillBox(el, s);
     }
     var li = list.querySelector('li[data-id="' + s.id + '"]');
     if (li) {
@@ -406,42 +429,46 @@
     hint.style.display = state.slots.length ? "none" : "block";
     stage.style.setProperty("--canvas-h", String(state.canvas.h));
     paintGrid();
-    function layerRow(s, child) {
+    function layerRow(s) {
       var li = document.createElement("li");
       var cls = [];
       if (s.id === sel) cls.push("sel");
       if (s.media_kind === "group") cls.push("group");
-      if (child) cls.push("child");
+      if (s.parent_id) cls.push("child");
       if (sel && slotById(sel) && slotById(sel).parent_id === s.id) cls.push("host");
+      if (!s.enabled) cls.push("off");
       li.dataset.id = s.id;
       var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
       if (live) cls.push("live");
       li.className = cls.join(" ");
-      li.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
-      li.querySelector("span").textContent = s.label || s.id;
-      li.addEventListener("click", function (e) {
+      var row = document.createElement("div");
+      row.className = "row";
+      row.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="' + (s.enabled ? "hide" : "show") + '">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
+      row.querySelector("span").textContent = s.label || s.id;
+      row.addEventListener("click", function (e) {
         if (e.target.closest("[data-eye]")) return;
         sel = s.id;
         render();
       });
-      list.appendChild(li);
-    }
-    var ordered = state.slots.filter(function (s) { return !s.parent_id; }).sort(function (a, b) { return b.z - a.z; });
-    list.innerHTML = "";
-    ordered.forEach(function (s) {
-      layerRow(s, false);
+      li.appendChild(row);
       if (s.media_kind === "group") {
-        state.slots.filter(function (c) { return c.parent_id === s.id; }).sort(function (a, b) { return b.z - a.z; }).forEach(function (c) {
-          layerRow(c, true);
-        });
+        var sub = document.createElement("ul");
+        sub.className = "members";
+        membersOf(s.id).forEach(function (c) { sub.appendChild(layerRow(c)); });
+        li.appendChild(sub);
       }
-    });
-    boxes.innerHTML = "";
-    state.slots.forEach(function (s) {
+      return li;
+    }
+    function addBox(s, host) {
+      if (!stageShown(s)) return;
       var el = document.createElement("div");
       el.dataset.id = s.id;
       placeBox(el, s);
       fillBox(el, s);
+      host.appendChild(el);
+      if (s.media_kind === "group") {
+        membersOf(s.id).forEach(function (c) { addBox(c, el); });
+      }
       if (s.id === sel) {
         ["n", "s", "e", "w", "nw", "ne", "sw", "se"].forEach(function (h) {
           var hd = document.createElement("div");
@@ -450,8 +477,12 @@
           el.appendChild(hd);
         });
       }
-      boxes.appendChild(el);
-    });
+    }
+    var ordered = state.slots.filter(function (s) { return !s.parent_id; }).sort(function (a, b) { return b.z - a.z; });
+    list.innerHTML = "";
+    ordered.forEach(function (s) { list.appendChild(layerRow(s)); });
+    boxes.innerHTML = "";
+    ordered.forEach(function (s) { addBox(s, boxes); });
     paintInspector();
   }
 
@@ -930,7 +961,15 @@
       document.getElementById("f-h").value = s.h;
     }
     var el = boxes.querySelector('.box[data-id="' + s.id + '"]');
-    if (el) placeBox(el, s);
+    if (el) {
+      placeBox(el, s);
+      if (s.media_kind === "group") {
+        membersOf(s.id).forEach(function (c) {
+          var cel = el.querySelector(':scope > .box[data-id="' + c.id + '"]');
+          if (cel) placeBox(cel, c);
+        });
+      }
+    }
   });
   boxes.addEventListener("pointerup", function () {
     if (!drag) return;
@@ -959,7 +998,9 @@
         });
         document.querySelectorAll("#layer-list li, #boxes .box").forEach(function (el) {
           var cur = slotById(el.dataset.id);
-          if (cur) el.classList.toggle("live", !!cur.visible);
+          if (!cur) return;
+          var live = !!cur.visible || (cur.parent_id && slotById(cur.parent_id) && slotById(cur.parent_id).visible);
+          el.classList.toggle("live", live);
         });
         setObsPill(s.obs && s.obs.connected);
         fillScenes(s.obs);
