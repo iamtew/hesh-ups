@@ -142,9 +142,8 @@ func onReady(s *Server) {
 }
 
 func openBrowser(url string) {
-	cmd := exec.Command("cmd", "/c", "start", "", url)
-	cmd.SysProcAttr = &syscall.SysProcAttr{HideWindow: true}
-	_ = cmd.Start()
+	// explorer, not cmd /c start: start shares this console and closes the tray.
+	_ = exec.Command("explorer.exe", url).Start()
 }
 
 func closeViews() {
