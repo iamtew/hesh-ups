@@ -73,9 +73,15 @@ func (s *Server) Close() {
 	s.db.Close()
 }
 
-// Serve is the app HTTP server. main and tests both call this.
-func (s *Server) Serve(ln net.Listener) error {
-	return http.Serve(ln, s.Handler())
+// Serve listens on addr and serves this app in the background.
+// The product passes bind:port. Tests pass 127.0.0.1:0.
+func (s *Server) Serve(addr string) (net.Listener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	go http.Serve(ln, s.Handler())
+	return ln, nil
 }
 
 func (s *Server) Handler() http.Handler {

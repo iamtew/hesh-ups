@@ -255,7 +255,7 @@ Media library is the `media/` directory (`GET /api/media` lists it). No extra ta
 ## Runtime
 
 1. Open SQLite (`HESH_UPS_DB` or default path). Create/migrate. Ensure `media/` exists.
-2. Listen `bind:port`. If bind fails (port in use or permission): log the error to stderr and `os.Exit(1)`. That is the single-instance rule — no mutex, no second socket. `go test` calls the same `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. It does not bind `:18745`.
+2. `Serve(bind:port)`. If that listen fails (port in use or permission): log the error to stderr and `os.Exit(1)`. That is the single-instance rule — no mutex, no second listen in the product process. `go test` calls that same `Serve` on `127.0.0.1:0` with a temp DB. It does not bind `:18745`.
 3. Connect obs-websocket in the background; reconnect with backoff. Tray/composer show connected or not. Tests MUST NOT start systray or WebView.
 4. Overlay clients subscribe to `/ws`. On connect: send `config` (canvas + all slots) then `snapshot` (currently visible).
 5. Fire: reject if `enabled=0` (`404` `unknown_slot` — URL dead while the eye is off). Merge vars, render text, bump `seq`, mark visible, log, broadcast `show` (include `volume`). Duration timer if set. Retrigger restarts media, text, `seq`, timer. Persist/delete `visible` per table rules. Stop / stop_all / duration / matching `ended` clear memory, `visible` row, and broadcast.
@@ -656,7 +656,7 @@ MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:1
 ### R13 — DB override
 
 **Given** two temp DB files A and B  
-**When** handler A is seeded with `logo`; handler B opens B empty  
+**When** server A is seeded with `logo`; server B opens B empty  
 **Then** B has no `logo` slot — data does not leak across DB files
 
 ### R14 — text template

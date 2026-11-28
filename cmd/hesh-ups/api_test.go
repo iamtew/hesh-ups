@@ -27,15 +27,21 @@ var png1x1 = []byte{
 	0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
 }
 
-// serveTest is main's listen path: net.Listen + Server.Serve. Port 0 stays off :18745.
+// serveTest is Server.Serve, the same call main makes. Port 0 stays off :18745.
 func serveTest(t *testing.T, s *Server) (string, func()) {
 	t.Helper()
-	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	ln, err := s.Serve("127.0.0.1:0")
 	if err != nil {
 		t.Fatal(err)
 	}
-	go s.Serve(ln)
-	return "http://" + ln.Addr().String(), func() { ln.Close() }
+	host, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil || host != "127.0.0.1" || port == "18745" {
+		ln.Close()
+		t.Fatalf("listen %s", ln.Addr())
+	}
+	stop := func() { ln.Close() }
+	t.Cleanup(stop)
+	return "http://" + ln.Addr().String(), stop
 }
 
 func testSrv(t *testing.T) (*Server, string) {

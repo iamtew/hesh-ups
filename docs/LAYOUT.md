@@ -266,7 +266,7 @@ PowerShell. `default` → `just --list`.
 | --- | --- |
 | `run` | from repo root: `go run ./cmd/hesh-ups` |
 | `build` | ldflags version → `dist/hesh-ups.exe` |
-| `test` | `go vet ./...` and `go test ./...` (in-process; hesh-ups.md R1–R23) |
+| `test` | `go vet ./...` and `go test ./...` (app `Serve` on `127.0.0.1:0`; hesh-ups.md R1–R23) |
 | `fmt` | `go fmt ./...` |
 | `package` | `build` → `dist/hesh-ups.exe` only |
 | `verify-package` | fail if exe missing or if `dist/web` exists |

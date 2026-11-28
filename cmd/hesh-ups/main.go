@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"net"
 	"os"
 	"path/filepath"
 )
@@ -32,12 +31,10 @@ func run() error {
 	}
 	defer srv.Close()
 	addr := srv.setting("bind") + ":" + srv.setting("port")
-	ln, err := net.Listen("tcp", addr)
-	if err != nil {
+	if _, err := srv.Serve(addr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	go srv.Serve(ln)
 	if os.Getenv("HESH_UPS_HTTP") == "1" {
 		fmt.Fprintln(os.Stderr, "http "+addr)
 		select {}
