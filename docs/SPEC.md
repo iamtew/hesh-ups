@@ -24,7 +24,7 @@ hesh-ups is a **named, laid-out overlay**. Streamer.bot (or anything that can hi
 | Who | Job |
 | --- | --- |
 | Operator | Lay out a 1080 (or custom) overlay once in the composer **plot**: drag named boxes, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. Boxes are outlines until selected (**preview**, sample fill) or fired (**program**, green live mark). |
-| Operator | Copy one trigger URL per top-level slot (group members are not fireable) and paste it into Streamer.bot / Stream Deck HTTP / a browser. |
+| Operator | Open tray **Board** to fire/hide every top-level slot and copy its trigger URLs into Streamer.bot / Stream Deck HTTP / a browser. Group members are not fireable. |
 | Operator | Open tray **Overlay preview** to see the same transparent page OBS shows (program only — empty until fire). |
 | Operator | Test-fire a slot from the composer (same URL as production), including sample `{user}` text. |
 | Operator | Add **one** transparent Browser Source the size of the canvas and be done. Audio is routed into OBS (`reroute_audio`). |
@@ -49,9 +49,10 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 
 | Surface | What |
 | --- | --- |
-| Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
+| Systray | Exit; board, composer, and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
 | Composer | `GET /composer/` — plot stage + OBS. Same embed. |
+| Board | `GET /board/` — fire/hide/copy-URL list of top-level slots. Same embed. |
 | HTTP API | Fire/hide, state, health, scenes. Bind `127.0.0.1`. |
 | Overlay WebSocket | `GET /ws` (upgrade) — server pushes events to overlay clients. |
 | obs-websocket client | JSON to local OBS. |
@@ -268,7 +269,7 @@ Assets: files under `media/`, served at `GET /media/...`.
 
 All JSON responses are objects. Unknown slot → `404` `{"error":"unknown_slot","message":"unknown slot"}`.
 
-If `token` is non-empty, fire/hide/hide_all and scene-switch require `Authorization: Bearer <token>` **or** query `?token=`. That is the URL you paste into other software. Health, state, slot CRUD, settings, overlay, `/ws`, `/media/`, `/composer` do not (bind is localhost; WebView is not an auth client). Empty token = all open on localhost.
+If `token` is non-empty, fire/hide/hide_all and scene-switch require `Authorization: Bearer <token>` **or** query `?token=`. That is the URL you paste into other software. Health, state, slot CRUD, settings, overlay, `/ws`, `/media/`, `/composer`, `/board` do not (bind is localhost; WebView is not an auth client). Empty token = all open on localhost.
 
 GET and POST are both accepted on fire/hide/hide_all/scene so Streamer.bot “open URL” works.
 
@@ -361,7 +362,7 @@ Example: `GET /api/popup/follow?user=Ada&amount=1` with template `Thanks {user}!
 
 `POST /api/quit` — 204; close WebView windows then tray `systray.Quit`. Tests set callbacks and MUST NOT start the tray.
 
-`POST /api/view/close` — 204; Terminate composer/overlay WebViews if open. Browser tabs still `window.close()`.
+`POST /api/view/close` — 204; Terminate composer/overlay/board WebViews if open. Browser tabs still `window.close()`.
 
 `POST /api/help` — 204; open Pages `docs.html#composer` in the system browser. Tests stub; MUST NOT `exec`.
 
@@ -440,6 +441,18 @@ If `/api/state` polling fails, a full-window down banner: application not runnin
 Changing id on save = new slot (old URL 404s). Warn.
 
 Overlay page: vanilla `web/overlay/index.html` (+ css/js). No frameworks. Transparent; not this chrome.
+
+---
+
+## Board
+
+Page `/board/`. Files: `web/board/index.html`, `style.css`, `app.js`. Vanilla. Compact list, not the composer plot. No Pixi, no settings, no scene picker. WebView ~560×720.
+
+List **top-level** slots only (a group is one row; members are not fireable). Disabled slots stay on the list, dimmed; Fire still 404s.
+
+Each row: label + id, live mark from `/api/state` `visible`, **Fire**, **Hide**, **Copy fire URL**, **Copy hide URL**. Fire is `POST /api/popup/{id}?user=Ada` plus token query if set (same sample as composer Test). Copied fire URL is `http://127.0.0.1:{port}/api/popup/{id}` with `?token=` only when a token is set — no `user=Ada` on the paste. Hide URL is that path plus `/hide`. Header **Hide all**. Status line for copy/fire/hide/errors. Poll `/api/state` (~2s); load token from `/api/settings`. Composer inspector Test/copy stays.
+
+If polling fails, a full-window down banner: application not running.
 
 ---
 
@@ -538,6 +551,7 @@ Not in product: OBS hotkeys, Media Sources, auto hide of this source, vendor req
 
 Embedded `cmd/hesh-ups/icon.ico` (from `just icon` / `assets/logo.png`) for the tray notification glyph. Exe PE icon is `rsrc_windows_amd64.syso`. Menu items set Tabler `.ico` from `cmd/hesh-ups/icons/` via `MenuItem.SetIcon`. Overlay page has no chrome icons.
 
+- **Board** ▸ **Open window** — WebView `http://127.0.0.1:{port}/board/` (~560×720); **Open in browser** — same URL in the system browser
 - **Composer** ▸ **Open window** — WebView `http://127.0.0.1:{port}/composer/` (~1280×800); **Open in browser** — same URL in the system browser
 - **Overlay preview** ▸ **Open window** — WebView `/overlay/` (1280×720 unless canvas fits); **Open in browser** — same URL in the system browser
 - **OBS: connected** / **OBS: disconnected** — label
@@ -551,7 +565,7 @@ Tooltip: `hesh-ups` + version.
 
 ## Build
 
-Windows. `just build` → one exe (overlay + composer compiled in). `just test` runs verification (below). First run creates the DB and `media/`. Packaging: [LAYOUT.md](LAYOUT.md).
+Windows. `just build` → one exe (overlay + composer + board compiled in). `just test` runs verification (below). First run creates the DB and `media/`. Packaging: [LAYOUT.md](LAYOUT.md).
 
 ---
 
