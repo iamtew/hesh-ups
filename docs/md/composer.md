@@ -2,7 +2,11 @@
 
 Open from the tray (WebView or system browser). Three panes: layers, canvas, inspector. File menu → **Settings** (or the OBS pill) for OBS and Run at login.
 
-The stage is WYSIWYG: media and sample-filled banners (`{user}` → Ada, same as **Test**) as on stream. Grid, handles, and layer **label** are chrome only. Tray overlay preview is the transparent OBS page.
+The stage is a **plot**: named dashed boxes for where popups live. It is not the stream picture.
+
+- Click a layer or box to **preview** that graphic (sample `{user}` → Ada, same as **Test**). Select a group to preview the whole group.
+- **Test** takes it to **program** (same fire URL as Streamer.bot). Green mark = on air. **Hide** / duration / clip end takes it down. The plot box stays unless you deselect.
+- Tray **Overlay preview** and the OBS Browser Source are program only: empty until fire. Grid, handles, names, and GROUP tags are composer chrome — never drawn in OBS.
 
 - Each slot is one type: **text**, **image**, **gif**, **video**, **audio**, or **group**. The inspector only shows knobs for that type.
 - **+** adds a text slot. Type is the first inspector control. Text gets a template plus a theme (plain or glass). Media types get a file; video/audio also get playback and volume.

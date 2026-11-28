@@ -23,9 +23,9 @@ hesh-ups is a **named, laid-out overlay**. Streamer.bot (or anything that can hi
 
 | Who | Job |
 | --- | --- |
-| Operator | Lay out a 1080 (or custom) overlay once in a WYSIWYG composer: drag slots, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. The stage shows media and sample-filled banners as OBS will. |
+| Operator | Lay out a 1080 (or custom) overlay once in the composer **plot**: drag named boxes, pick a **type**, pick files or write a text template and theme, group media with text in a container, set play-once or loop, optional max duration. Boxes are outlines until selected (**preview**, sample fill) or fired (**program**, green live mark). |
 | Operator | Copy one trigger URL per top-level slot (group members are not fireable) and paste it into Streamer.bot / Stream Deck HTTP / a browser. |
-| Operator | Preview the same overlay in a WebView without guessing what OBS will show. |
+| Operator | Open tray **Overlay preview** to see the same transparent page OBS shows (program only — empty until fire). |
 | Operator | Test-fire a slot from the composer (same URL as production), including sample `{user}` text. |
 | Operator | Add **one** transparent Browser Source the size of the canvas and be done. Audio is routed into OBS (`reroute_audio`). |
 | Viewer | When the URL is hit, that slot (or group) **appears on stream** at its position. |
@@ -51,7 +51,7 @@ Not a job: parse Twitch, TTS, goals, chat boxes. Those stay in the brain.
 | --- | --- |
 | Systray | Exit; composer and overlay preview (WebView or system browser); OBS connected/disconnected. Menu items use vendored Tabler icons (`.ico`). |
 | Overlay page | `GET /overlay/` — transparent SPA, 100% canvas, **embedded in the exe**. |
-| Composer | `GET /composer/` — WYSIWYG stage + OBS. Same embed. |
+| Composer | `GET /composer/` — plot stage + OBS. Same embed. |
 | HTTP API | Fire/hide, state, health, scenes. Bind `127.0.0.1`. |
 | Overlay WebSocket | `GET /ws` (upgrade) — server pushes events to overlay clients. |
 | obs-websocket client | JSON to local OBS. |
@@ -412,7 +412,7 @@ Look: **house designer chrome** (same as Border Studio / Show Credits), not a we
 
 **Layers (left ~240px):** slot list, front = high `z`. Groups nest members in the list. Click selects. Eye toggles `enabled`: off hides the box on the composer stage (a group hides its members) and fire is 404. **+** adds a top-level **text** slot (`id` `slot-n`, `theme` `plain`, `text_template` `New slot`, **`duration_ms` 5000**). Trash deletes (`DELETE`; group deletes children). Empty canvas: one hint, no fake sample slot. No jb2 visualizers. Text themes are the embedded banner set, not disk skins.
 
-**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **WYSIWYG** of overlay slot content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). Grid, cyan handles, layer `label`, group fill/tags (`GROUP` / `IN {group}`), and inspector group banner are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page. Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
+**Canvas (center):** letterboxed 16:9 of `canvas_w`×`canvas_h`. **Plot**, not program: enabled slots are dashed named boxes. **Select** fills that slot (a group fills its members) with overlay content (image/gif/video + filled `text_template`; `{user}` sample is `Ada`, same as Test). **Live** (`visible`, Test or HTTP) fills the same way plus the green live mark. Grid, cyan handles, layer names, group fill/tags (`GROUP` / `IN {group}`), and inspector group banner are composer chrome — not drawn in OBS. Tray overlay preview stays the transparent OBS page (program only). Pointer math in **canvas pixels**. Framing grid is SVG on the composer only. Selected box: cyan outline, eight handles (n/s/e/w/nw/ne/sw/se). Drag move; handles resize. Min size 32×32. Clamp to canvas. Snap 12px to grid lines and to other slot edges/centers when Snap is on. While dragging, update the inspector numbers live; **`PUT /api/slots/{id}` on pointerup** (not per mousemove). Overlay in OBS does not need live follow during drag.
 
 **Inspector (right ~280px):** slot only — id, **label**, x y w h z (typing updates the box live; **`PUT` on change/blur** / pointerup). **type** first (`text` / `image` / `gif` / `video` / `audio` / `group`). Only knobs for that kind: text → template + theme; image/gif → file; video/audio → file + playback + volume; group → member list + Add member. Duration on the fireable slot (not on children). **Test** / **Hide** / copy trigger URL use the group id for members. Trash. Empty selection: “Select a slot”. OBS credentials and autostart live in Settings, not here. Id rename still needs Save (warns).
 
