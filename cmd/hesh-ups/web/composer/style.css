@@ -26,6 +26,7 @@ body.admin .win { display: flex; flex-direction: column; min-height: 0; backgrou
   width: 1.1em; height: 1.1em; stroke: currentColor; fill: none;
   vertical-align: -0.15em; flex-shrink: 0;
 }
+button .icon { pointer-events: none; }
 body.admin button, body.admin #bar a {
   background: var(--lift);
   color: var(--text);
@@ -129,7 +130,6 @@ body.admin input[type="checkbox"] { width: auto; }
 #layer-list li.live > .row { box-shadow: inset 3px 0 var(--accent2); }
 #layer-list li.child.live > .row { box-shadow: inset 3px 0 var(--accent), inset 6px 0 var(--accent2); }
 #layer-list [data-eye] { width: auto; min-width: 28px; min-height: 28px; padding: 4px; flex: none; }
-#layer-list [data-eye] .icon { pointer-events: none; }
 #layer-list li.off { opacity: 0.4; }
 #layer-list li.off li { opacity: 1; }
 .box.live { box-shadow: inset 0 0 0 2px var(--accent2); }

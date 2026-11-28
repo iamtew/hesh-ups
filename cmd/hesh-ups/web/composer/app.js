@@ -789,10 +789,18 @@
     });
   }
 
+  function buttonFrom(e) {
+    var path = e.composedPath ? e.composedPath() : [];
+    for (var i = 0; i < path.length; i++) {
+      if (path[i] && path[i].tagName === "BUTTON") return path[i];
+    }
+    return e.target && e.target.closest ? e.target.closest("button") : null;
+  }
+
   document.getElementById("inspector-pane").addEventListener("click", function (e) {
     var s = slotById(sel);
     if (!s) return;
-    var btn = e.target.closest("button");
+    var btn = buttonFrom(e);
     var id = btn ? btn.id : e.target.id;
     if (id === "f-parent") {
       sel = s.parent_id;

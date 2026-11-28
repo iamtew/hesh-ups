@@ -83,6 +83,9 @@
   function topSlots(slots) {
     return (slots || []).filter(function (s) {
       return !s.parent_id;
+    }).sort(function (a, b) {
+      if (a.z !== b.z) return b.z - a.z;
+      return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
     });
   }
 
@@ -150,9 +153,17 @@
     });
   }
 
+  function buttonFrom(e) {
+    var path = e.composedPath ? e.composedPath() : [];
+    for (var i = 0; i < path.length; i++) {
+      if (path[i] && path[i].tagName === "BUTTON") return path[i];
+    }
+    return e.target && e.target.closest ? e.target.closest("button") : null;
+  }
+
   list.addEventListener("click", function (e) {
-    var btn = e.target.closest("button");
-    if (!btn) return;
+    var btn = buttonFrom(e);
+    if (!btn || !list.contains(btn)) return;
     var row = btn.closest(".row");
     if (!row) return;
     var id = row.dataset.id;

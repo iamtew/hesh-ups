@@ -21,6 +21,7 @@ body.admin {
   width: 1.1em; height: 1.1em; stroke: currentColor; fill: none;
   vertical-align: -0.15em; flex-shrink: 0;
 }
+button .icon { pointer-events: none; }
 body.admin button {
   background: var(--lift);
   color: var(--text);
