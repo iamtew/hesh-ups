@@ -161,9 +161,9 @@
       el.playsInline = true;
       el.setAttribute("playsinline", "");
       el.setAttribute("webkit-playsinline", "");
-      el.muted = true;
+      el.muted = false;
       el._heshVol = vol;
-      el.volume = 0;
+      el.volume = vol;
       el.src = (msg.media_url || "") + (msg.seq != null ? "?s=" + msg.seq : "");
       if (msg.playback === "loop") el.loop = true;
       if (msg.playback !== "loop" && ended) {
@@ -172,36 +172,38 @@
       function queue() {
         if (pendingSound.indexOf(el) < 0) pendingSound.push(el);
       }
-      // Muted play first so the picture starts. Unmute is a second play();
-      // if that is blocked, go back to muted so the frames keep going.
-      function loud() {
-        if (el._heshLoud) return;
-        el._heshLoud = true;
+      // OBS only captures a track that is audible on the first play().
+      // A normal browser may still block that; mute then so the picture continues.
+      var tries = 0;
+      function kick() {
+        if (el._heshTried || el._heshKick || tries > 2) return;
+        tries++;
+        el._heshKick = true;
         el.muted = false;
         el.volume = vol;
         var p = el.play();
         if (p && p.then) {
-          p.catch(function () {
+          p.then(function () {
+            el._heshTried = true;
+            el._heshKick = false;
+          }).catch(function (err) {
+            el._heshKick = false;
+            if (!err || err.name !== "NotAllowedError") {
+              if (el.readyState >= 2) kick();
+              return;
+            }
+            el._heshTried = true;
             el.muted = true;
-            el.volume = 0;
             var again = el.play();
             if (again && again.catch) again.catch(function () {});
             queue();
           });
+          return;
         }
+        el._heshTried = true;
+        el._heshKick = false;
       }
-      function kick() {
-        if (el._heshLoud) return;
-        el.muted = true;
-        el.volume = 0;
-        var p = el.play();
-        if (p && p.then) {
-          p.then(loud).catch(queue);
-        } else {
-          loud();
-        }
-      }
-      el.addEventListener("canplay", kick, { once: true });
+      el.addEventListener("canplay", kick);
       host.appendChild(el);
       kick();
       return;

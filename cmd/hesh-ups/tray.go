@@ -6,6 +6,7 @@ import (
 	"embed"
 	"os"
 	"os/exec"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -170,7 +171,23 @@ func liveView(title string) *webview2.WebView {
 	}
 }
 
+// Same switch OBS Browser Source uses. Set before the first WebView so every
+// window (composer, triggers, overlay) shares it. Read once per user-data folder.
+func allowAutoplay() {
+	const flag = "--autoplay-policy=no-user-gesture-required"
+	cur := os.Getenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+	if strings.Contains(cur, "autoplay-policy=") {
+		return
+	}
+	next := flag
+	if cur != "" {
+		next = cur + " " + flag
+	}
+	_ = os.Setenv("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS", next)
+}
+
 func openView(title, url string, w, h int) {
+	allowAutoplay()
 	slot := liveView(title)
 	viewMu.Lock()
 	if *slot != nil {
