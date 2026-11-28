@@ -414,10 +414,12 @@ Overlay DOM: one node per **top-level** slot, class `slot popup`, positioned wit
 
 Logo and house chrome. Overlay text themes keep their own palettes.
 
+Wordmark: **hesh** is teal, **ups** is olive (same split as the HU logo). The hyphen is not a third color. Do not paint the name in running prose.
+
 | Name | Hex | Job |
 | --- | --- | --- |
-| teal | `#008080` | Main. Selection, links, buttons, group chrome. CSS `--accent`. |
-| olive | `#7f7f00` | Accent. Live mark, connected pill, group members. CSS `--accent2`. |
+| teal | `#008080` | Main. **hesh**. Selection, links, buttons, group chrome. CSS `--accent`. |
+| olive | `#7f7f00` | Accent. **ups**. Live mark, connected pill, group members. CSS `--accent2`. |
 | platinum | `#d4d8dc` | Details. Pages body text and hairlines. Not admin `--muted` (`#9a9a9a` stays readable on `#282828`). |
 
 ---

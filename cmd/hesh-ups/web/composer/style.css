@@ -47,6 +47,8 @@ body.admin input[type="checkbox"] { width: auto; }
   gap: 12px; flex: none; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px;
 }
 .bar-brand { white-space: nowrap; font-weight: 700; }
+.bar-brand .hesh { color: var(--accent); }
+.bar-brand .ups { color: var(--accent2); }
 .bar-brand-wrap { position: relative; display: flex; align-items: center; gap: 8px; flex: none; }
 .bar-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .bar-overlay { display: flex; align-items: center; gap: 8px; }

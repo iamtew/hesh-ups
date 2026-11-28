@@ -50,6 +50,8 @@ body.admin button:focus-visible {
 }
 .bar-brand-wrap img { width: 1.75em; height: 1.75em; object-fit: contain; display: block; }
 .bar-brand { font-weight: 700; white-space: nowrap; }
+.bar-brand .hesh { color: var(--accent); }
+.bar-brand .ups { color: var(--accent2); }
 .win-title {
   color: var(--accent); font-weight: 700; font-size: 11px;
   letter-spacing: 0.08em; text-transform: uppercase;

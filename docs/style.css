@@ -70,3 +70,5 @@ a { color: var(--accent); }
 .doc { flex: 1; padding: 1.5rem 2rem; max-width: 48rem; }
 .doc img { max-width: 100%; }
 .muted { color: var(--muted); }
+.wordmark .hesh { color: var(--accent); }
+.wordmark .ups { color: var(--accent2); }
