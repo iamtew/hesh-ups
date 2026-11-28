@@ -749,6 +749,27 @@ func TestViewCloseAndHelp(t *testing.T) {
 	}
 }
 
+func TestEnabledPut(t *testing.T) {
+	s, ts := testSrv(t)
+	putLogo(t, s, ts)
+	doJSON(t, "PUT", ts.URL+"/api/slots/logo", map[string]any{
+		"id": "logo", "label": "Logo", "x": 100, "y": 40, "w": 320, "h": 180, "z": 1,
+		"media_kind": "image", "media_path": "logo.png", "playback": "once", "volume": 100, "enabled": false,
+	})
+	var st map[string]any
+	getJSON(t, ts, "/api/state", &st)
+	for _, raw := range st["slots"].([]any) {
+		m := raw.(map[string]any)
+		if m["id"] == "logo" && m["enabled"] != false {
+			t.Fatal(m["enabled"])
+		}
+	}
+	res, _ := doJSON(t, "POST", ts.URL+"/api/popup/logo", nil)
+	if res.StatusCode != 404 {
+		t.Fatal(res.StatusCode)
+	}
+}
+
 func TestSharedBanner(t *testing.T) {
 	_, ts := testSrv(t)
 	res, err := http.Get(ts.URL + "/shared/banner.css")
