@@ -1106,3 +1106,101 @@ func TestSceneHasSource(t *testing.T) {
 		t.Fatal("false positive")
 	}
 }
+
+func putShowSlot(t *testing.T, base, id, kind, path, text, parent string) {
+	t.Helper()
+	res, b := doJSON(t, "PUT", base+"/api/slots/"+id, map[string]any{
+		"id": id, "label": id, "x": 0, "y": 0, "w": 80, "h": 40, "z": 1,
+		"media_kind": kind, "media_path": path, "text_template": text,
+		"playback": "once", "volume": 100, "enabled": true, "parent_id": parent,
+	})
+	if res.StatusCode != 200 {
+		t.Fatalf("put %s %d %s", id, res.StatusCode, b)
+	}
+}
+
+func TestShowKinds(t *testing.T) {
+	s, ts := testSrv(t)
+	files := map[string][]byte{
+		"logo.png":  png1x1,
+		"anim.gif":  []byte("GIF89a"),
+		"clip.webm": []byte("x"),
+		"tone.mp3":  []byte("x"),
+	}
+	for name, body := range files {
+		if err := os.WriteFile(filepath.Join(s.mediaDir, name), body, 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	type row struct {
+		id, kind, path, text string
+	}
+	rows := []row{
+		{"banner", "text", "", "Hi {user}"},
+		{"pic", "image", "logo.png", ""},
+		{"anim", "gif", "anim.gif", ""},
+		{"clip", "video", "clip.webm", ""},
+		{"tone", "audio", "tone.mp3", ""},
+	}
+	for _, r := range rows {
+		putShowSlot(t, ts, r.id, r.kind, r.path, r.text, "")
+	}
+	putShowSlot(t, ts, "pack", "group", "", "", "")
+	putShowSlot(t, ts, "pack-t", "text", "", "Hi", "pack")
+	putShowSlot(t, ts, "pack-v", "video", "clip.webm", "", "pack")
+
+	c := wsDial(t, ts)
+	readType(t, c, "config", 2*time.Second)
+	readType(t, c, "snapshot", 2*time.Second)
+
+	for _, r := range rows {
+		url := ts + "/api/popup/" + r.id
+		if r.kind == "text" {
+			url += "?user=Ada"
+		}
+		res, b := doJSON(t, "POST", url, nil)
+		if res.StatusCode != 200 {
+			t.Fatalf("%s %d %s", r.id, res.StatusCode, b)
+		}
+		show := readType(t, c, "show", 2*time.Second)
+		if show["slot"] != r.id || show["media_kind"] != r.kind || show["playback"] != "once" {
+			t.Fatalf("%s %v", r.id, show)
+		}
+		wantURL := ""
+		if r.path != "" {
+			wantURL = "/media/" + r.path
+		}
+		if show["media_url"] != wantURL {
+			t.Fatalf("%s url %v", r.id, show["media_url"])
+		}
+		if r.kind == "text" && show["text"] != "Hi Ada" {
+			t.Fatalf("text %v", show["text"])
+		}
+	}
+
+	res, b := doJSON(t, "POST", ts+"/api/popup/pack", nil)
+	if res.StatusCode != 200 {
+		t.Fatalf("pack %d %s", res.StatusCode, b)
+	}
+	show := readType(t, c, "show", 2*time.Second)
+	if show["media_kind"] != "group" || show["media_url"] != "" || show["playback"] != "once" {
+		t.Fatalf("%v", show)
+	}
+	members, ok := show["members"].([]any)
+	if !ok || len(members) != 2 {
+		t.Fatalf("members %v", show["members"])
+	}
+	got := map[string]string{}
+	for _, raw := range members {
+		m := raw.(map[string]any)
+		kind, _ := m["media_kind"].(string)
+		url, _ := m["media_url"].(string)
+		got[kind] = url
+		if kind == "text" && m["text"] != "Hi" {
+			t.Fatalf("member text %v", m["text"])
+		}
+	}
+	if got["text"] != "" || got["video"] != "/media/clip.webm" {
+		t.Fatalf("members %v", got)
+	}
+}
