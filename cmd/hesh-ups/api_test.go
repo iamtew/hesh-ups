@@ -1204,3 +1204,67 @@ func TestShowKinds(t *testing.T) {
 		t.Fatalf("members %v", got)
 	}
 }
+
+// These strings are the bugs that already shipped once: a transformed canvas
+// blanks video, a muted first play() is silent in OBS, and WebView2 blocks
+// sound unless the autoplay switch is set before the window exists.
+func TestOverlayPlaybackLocks(t *testing.T) {
+	js := mustRead(t, "web/overlay/app.js")
+	css := mustRead(t, "web/overlay/style.css")
+	tray := mustRead(t, "tray.go")
+	obs := mustRead(t, "obs.go")
+
+	if strings.Contains(js, "scale(") {
+		t.Fatal("canvas transform scale blanks video")
+	}
+	if !strings.Contains(js, "canvas.style.zoom") {
+		t.Fatal("canvas must scale with zoom")
+	}
+	if strings.Contains(js, "el.volume = 0") || strings.Contains(js, `setAttribute("muted"`) {
+		t.Fatal("playback must not start silent")
+	}
+	if strings.Count(js, "el.muted = true") != 1 {
+		t.Fatal("mute only in the NotAllowedError fallback")
+	}
+	if !strings.Contains(js, "el.volume = vol") || !strings.Contains(js, `err.name === "NotAllowedError"`) {
+		t.Fatal("play at slot volume, mute only when blocked")
+	}
+	if strings.Contains(js, ".load(") {
+		t.Fatal("load() of an empty src crashes WebView2")
+	}
+	show := js[strings.Index(js, "function show"):]
+	flat := strings.Index(show, `n.setAttribute("data-flat", "1")`)
+	paint := strings.Index(show, "void n.offsetWidth")
+	fill := strings.Index(show, "fillKind(")
+	if flat < 0 || paint < flat || fill < paint {
+		t.Fatal("video must be created after the slot is already visible")
+	}
+	if !strings.Contains(css, `[data-flat="1"]`) || !strings.Contains(css, "transition: none") {
+		t.Fatal("video slot must not fade or transform")
+	}
+	call := strings.LastIndex(tray, "allowAutoplay()")
+	nw := strings.Index(tray, "webview2.New")
+	if call < 0 || nw < 0 || call > nw || !strings.Contains(tray, "no-user-gesture-required") {
+		t.Fatal("autoplay policy must be set before any WebView")
+	}
+	route := strings.Index(obs, `"reroute_audio":`)
+	if route < 0 {
+		t.Fatal("browser source must route audio into OBS")
+	}
+	end := route + 40
+	if end > len(obs) {
+		end = len(obs)
+	}
+	if !strings.Contains(obs[route:end], "true") {
+		t.Fatal("reroute_audio must stay on")
+	}
+}
+
+func mustRead(t *testing.T, name string) string {
+	t.Helper()
+	b, err := os.ReadFile(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return string(b)
+}

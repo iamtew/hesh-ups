@@ -172,40 +172,35 @@
       function queue() {
         if (pendingSound.indexOf(el) < 0) pendingSound.push(el);
       }
-      // OBS only captures a track that is audible on the first play().
-      // A normal browser may still block that; mute then so the picture continues.
+      // First play() stays unmuted at the slot volume. OBS drops a track that
+      // starts muted, and a later unmute does not put it back. canplay must
+      // not start a second play that mutes. NotAllowedError (a normal browser)
+      // is the only path that mutes, so the picture still runs.
+      var started = false;
       var tries = 0;
-      function kick() {
-        if (el._heshTried || el._heshKick || tries > 2) return;
+      function start() {
+        if (started || tries > 2) return;
         tries++;
-        el._heshKick = true;
+        started = true;
         el.muted = false;
         el.volume = vol;
         var p = el.play();
-        if (p && p.then) {
-          p.then(function () {
-            el._heshTried = true;
-            el._heshKick = false;
-          }).catch(function (err) {
-            el._heshKick = false;
-            if (!err || err.name !== "NotAllowedError") {
-              if (el.readyState >= 2) kick();
-              return;
-            }
-            el._heshTried = true;
+        if (!p || !p.then) return;
+        p.catch(function (err) {
+          if (err && err.name === "NotAllowedError") {
             el.muted = true;
             var again = el.play();
             if (again && again.catch) again.catch(function () {});
             queue();
-          });
-          return;
-        }
-        el._heshTried = true;
-        el._heshKick = false;
+            return;
+          }
+          started = false;
+          if (el.readyState >= 2) start();
+        });
       }
-      el.addEventListener("canplay", kick);
+      el.addEventListener("canplay", start);
       host.appendChild(el);
-      kick();
+      start();
       return;
     }
     if (kind === "text") {
