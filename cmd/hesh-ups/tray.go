@@ -21,6 +21,7 @@ var (
 	viewMu     sync.Mutex
 	composerWV webview2.WebView
 	overlayWV  webview2.WebView
+	boardWV    webview2.WebView
 )
 
 //go:embed icon.ico
@@ -50,6 +51,12 @@ func onReady(s *Server) {
 	}
 	systray.SetIcon(trayIcon)
 	systray.SetTooltip("hesh-ups " + version)
+	mBoard := systray.AddMenuItem("Board", "Open board")
+	setMenuIcon(mBoard, "app-window")
+	mBoardWin := mBoard.AddSubMenuItem("Open window", "Open board WebView")
+	setMenuIcon(mBoardWin, "app-window")
+	mBoardWeb := mBoard.AddSubMenuItem("Open in browser", "Open board in browser")
+	setMenuIcon(mBoardWeb, "world")
 	mComposer := systray.AddMenuItem("Composer", "Open composer")
 	setMenuIcon(mComposer, "layout-board")
 	mComposerWin := mComposer.AddSubMenuItem("Open window", "Open composer WebView")
@@ -98,6 +105,10 @@ func onReady(s *Server) {
 	go func() {
 		for {
 			select {
+			case <-mBoardWin.ClickedCh:
+				openView("Board", base+"/board/", 560, 720)
+			case <-mBoardWeb.ClickedCh:
+				openBrowser(base + "/board/")
 			case <-mComposerWin.ClickedCh:
 				openView("Composer", base+"/composer/", 1280, 800)
 			case <-mComposerWeb.ClickedCh:
@@ -138,7 +149,7 @@ func openBrowser(url string) {
 
 func closeViews() {
 	viewMu.Lock()
-	cvs := []webview2.WebView{composerWV, overlayWV}
+	cvs := []webview2.WebView{composerWV, overlayWV, boardWV}
 	viewMu.Unlock()
 	for _, wv := range cvs {
 		if wv == nil {
@@ -158,18 +169,24 @@ func openView(title, url string, w, h int) {
 	wv.SetTitle(title)
 	wv.SetSize(w, h, webview2.HintNone)
 	viewMu.Lock()
-	if title == "Composer" {
+	switch title {
+	case "Composer":
 		composerWV = wv
-	} else {
+	case "Board":
+		boardWV = wv
+	default:
 		overlayWV = wv
 	}
 	viewMu.Unlock()
 	wv.Navigate(url)
 	wv.Run()
 	viewMu.Lock()
-	if title == "Composer" {
+	switch title {
+	case "Composer":
 		composerWV = nil
-	} else {
+	case "Board":
+		boardWV = nil
+	default:
 		overlayWV = nil
 	}
 	viewMu.Unlock()
