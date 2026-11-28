@@ -1,5 +1,7 @@
 (function () {
   var canvas = document.getElementById("canvas");
+  var canvasW = 0;
+  var canvasH = 0;
   var slots = {};
   var nodes = {};
   var hideGen = {};
@@ -22,6 +24,19 @@
   document.addEventListener("pointerdown", unlockAudio);
   document.addEventListener("keydown", unlockAudio);
 
+  // Canvas stays in canvas pixels. Scale fits the viewport (OBS at canvas size is 1:1).
+  function fitCanvas() {
+    if (canvasW <= 0 || canvasH <= 0) return;
+    canvas.style.width = canvasW + "px";
+    canvas.style.height = canvasH + "px";
+    var s = Math.min(window.innerWidth / canvasW, window.innerHeight / canvasH);
+    if (!isFinite(s) || s <= 0) s = 1;
+    var ox = Math.round((window.innerWidth - canvasW * s) / 2);
+    var oy = Math.round((window.innerHeight - canvasH * s) / 2);
+    canvas.style.transform = "translate(" + ox + "px," + oy + "px) scale(" + s + ")";
+  }
+  window.addEventListener("resize", fitCanvas);
+
   function connect() {
     ws = new WebSocket(proto + "//" + location.host + "/ws");
     ws.onmessage = function (ev) {
@@ -37,10 +52,11 @@
         (msg.slots || []).forEach(function (s) {
           slots[s.id] = s;
         });
-        if (msg.canvas) {
-          document.body.style.width = msg.canvas.w + "px";
-          document.body.style.height = msg.canvas.h + "px";
+        if (msg.canvas && msg.canvas.w > 0 && msg.canvas.h > 0) {
+          canvasW = msg.canvas.w;
+          canvasH = msg.canvas.h;
         }
+        fitCanvas();
         Object.keys(nodes).forEach(place);
         return;
       }
