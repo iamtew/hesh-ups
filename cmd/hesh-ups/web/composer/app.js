@@ -317,9 +317,16 @@
 
   function fillBox(el, s) {
     stopThemes(el);
-    var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
-    el.className = "box popup" + (s.id === sel ? " sel" : "") + (live ? " live" : "") + (s.parent_id ? " child" : "");
-    el.querySelectorAll("img, video, .banner-content").forEach(function (n) { n.remove(); });
+    var parent = s.parent_id ? slotById(s.parent_id) : null;
+    var live = !!s.visible || (parent && parent.visible);
+    var host = !!(sel && slotById(sel) && slotById(sel).parent_id === s.id);
+    el.className = "box popup"
+      + (s.id === sel ? " sel" : "")
+      + (live ? " live" : "")
+      + (s.media_kind === "group" ? " group" : "")
+      + (parent ? " child" : "")
+      + (host ? " host" : "");
+    el.querySelectorAll("img, video, .banner-content, .chrome-tag").forEach(function (n) { n.remove(); });
     var before = el.querySelector(".handle");
     function add(node) {
       if (before) el.insertBefore(node, before);
@@ -348,6 +355,12 @@
       add(wrap);
       var fx = themeFx();
       if (theme !== "plain" && fx[theme] && fx[theme].start) fx[theme].start(wrap);
+    }
+    if (s.media_kind === "group" || parent) {
+      var tag = document.createElement("div");
+      tag.className = "chrome-tag";
+      tag.textContent = s.media_kind === "group" ? "GROUP" : "IN " + ((parent && (parent.label || parent.id)) || s.parent_id);
+      add(tag);
     }
   }
 
@@ -395,11 +408,15 @@
     paintGrid();
     function layerRow(s, child) {
       var li = document.createElement("li");
-      if (s.id === sel) li.className = "sel";
-      if (child) li.className = (li.className ? li.className + " " : "") + "child";
+      var cls = [];
+      if (s.id === sel) cls.push("sel");
+      if (s.media_kind === "group") cls.push("group");
+      if (child) cls.push("child");
+      if (sel && slotById(sel) && slotById(sel).parent_id === s.id) cls.push("host");
       li.dataset.id = s.id;
       var live = !!s.visible || (s.parent_id && slotById(s.parent_id) && slotById(s.parent_id).visible);
-      if (live) li.className = (li.className ? li.className + " " : "") + "live";
+      if (live) cls.push("live");
+      li.className = cls.join(" ");
       li.innerHTML = '<button type="button" data-eye="' + esc(s.id) + '" aria-label="toggle enabled">' + icon(s.enabled ? "eye" : "eye-off") + "</button>" + icon(kindIcon(s)) + "<span></span>";
       li.querySelector("span").textContent = s.label || s.id;
       li.addEventListener("click", function (e) {
@@ -441,12 +458,23 @@
   function paintInspector() {
     var s = slotById(sel);
     if (!s) {
+      document.getElementById("inspector-pane").classList.remove("in-group", "member");
       inspector.innerHTML = '<p class="muted">Select a slot</p>';
       return;
     }
     var kind = s.media_kind || "text";
     var child = !!s.parent_id;
-    var html =
+    var parent = child ? slotById(s.parent_id) : null;
+    var pane = document.getElementById("inspector-pane");
+    pane.classList.toggle("in-group", child || kind === "group");
+    pane.classList.toggle("member", child);
+    var html = "";
+    if (kind === "group") {
+      html += '<div class="where">Group</div>';
+    } else if (child) {
+      html += '<button type="button" class="where member" id="f-parent">In group · ' + esc((parent && (parent.label || parent.id)) || s.parent_id) + "</button>";
+    }
+    html +=
       '<label>id <input id="f-id" value="' + esc(s.id) + '"></label>' +
       '<label>label <input id="f-label" value="' + esc(s.label || "") + '"></label>' +
       '<label>x <input id="f-x" type="number" value="' + s.x + '"></label>' +
@@ -457,7 +485,6 @@
     if (!child) {
       html += '<label>type <select id="f-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option><option value="group">group</option></select></label>';
     } else {
-      html += '<p class="muted">Member of ' + esc(s.parent_id) + '</p>';
       html += '<label>type <select id="f-kind"><option value="text">text</option><option value="image">image</option><option value="gif">gif</option><option value="video">video</option><option value="audio">audio</option></select></label>';
     }
     if (kind === "text") {
@@ -621,6 +648,11 @@
     if (!s) return;
     var btn = e.target.closest("button");
     var id = btn ? btn.id : e.target.id;
+    if (id === "f-parent") {
+      sel = s.parent_id;
+      render();
+      return;
+    }
     if (id === "f-save") {
       var body = readForm(s);
       if (!body) return;
