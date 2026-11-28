@@ -575,7 +575,7 @@ Windows. `just build` → one exe (overlay + composer + triggers compiled in). `
 
 `just test` is `go test ./...` (and `go vet`). It starts the app `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. Use the same `embed.FS` as production.
 
-MUST NOT: `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`). A live check is only the tray already on `http://127.0.0.1:18745`. If `GET /api/health` fails, say the tray app is not up. Do not start a second one, do not copy `%APPDATA%\hesh-ups`, do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`.
+`go test` MUST NOT `exec` `hesh-ups.exe`, start systray, open WebView, or `Listen` on `:18745`. Live OBS (R11) skips when a test builds the server **without** a real OBS connection (`obs: false`). A live check is the one tray on `http://127.0.0.1:18745`. If `GET /api/health` fails, start it with `just run` (real `%APPDATA%\hesh-ups`, product port). Do not copy that folder. Do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`. Do not bind another port. If health already succeeds, do not start another process.
 
 `just test` must fail if any required case fails.
 

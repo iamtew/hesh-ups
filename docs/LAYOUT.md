@@ -204,7 +204,7 @@ cmd/hesh-ups/
 go build -ldflags "-X main.version=<VERSION>" -o dist/hesh-ups.exe ./cmd/hesh-ups
 ```
 
-`just test`: `go vet ./...` and `go test ./...`. MUST cover hesh-ups.md R1–R23 by starting the app `Serve` on `127.0.0.1:0` with a temp DB and `embed.FS`. No `httptest`. MUST NOT `exec` the exe, MUST NOT start systray or WebView, MUST NOT `Listen` on the product port. Tests that import `main` MAY build tray files but MUST skip tray/window init (`main` only calling tray from `main()`). Live OBS (R11) MUST skip when `obs` is false. A live check is only the tray already on `http://127.0.0.1:18745`. If `GET /api/health` fails, say the tray app is not up. Do not start a second one.
+`just test`: `go vet ./...` and `go test ./...`. MUST cover hesh-ups.md R1–R23 by starting the app `Serve` on `127.0.0.1:0` with a temp DB and `embed.FS`. No `httptest`. `go test` MUST NOT `exec` the exe, start systray or WebView, or `Listen` on the product port. Tests that import `main` MAY build tray files but MUST skip tray/window init (`main` only calling tray from `main()`). Live OBS (R11) MUST skip when `obs` is false. A live check is the one tray on `http://127.0.0.1:18745`. If `GET /api/health` fails, start it with `just run` (real `%APPDATA%\hesh-ups`, product port). Do not copy that folder. Do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`. Do not bind another port. If health already succeeds, do not start another process.
 
 No CGO (`CGO_ENABLED=0`). Dist is **windows/amd64**. MUST NOT add fake `GOOS=linux` recipes while that is true.
 

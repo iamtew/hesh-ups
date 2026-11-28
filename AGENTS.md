@@ -19,6 +19,6 @@ Go module `github.com/iamtew/hesh-ups`. One binary: `./cmd/hesh-ups`. Pinned dep
 
 `systray.Run` is `main()`. `go test` starts the app `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. It MUST NOT start systray, WebView, or `Listen` on `:18745`.
 
-A live check is only the tray already on `http://127.0.0.1:18745` (health, state, popup, overlay, triggers, `/ws`). If `GET /api/health` fails, say the tray app is not up. Do not start a second one, do not copy `%APPDATA%\hesh-ups`, do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`.
+A live check is the one tray on `http://127.0.0.1:18745` (health, state, popup, overlay, triggers, `/ws`). If `GET /api/health` fails, start it with `just run` (real `%APPDATA%\hesh-ups`, product port). Do not copy that folder. Do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`. Do not bind another port. If health already succeeds, do not start another process.
 
 No `internal/` until a second binary exists. Overlay/composer/triggers stay embedded (`//go:embed all:web`). Pages stay `docs/` on `master`.

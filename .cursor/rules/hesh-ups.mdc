@@ -11,7 +11,7 @@ Behavior: `docs/SPEC.md`. File layout: `docs/LAYOUT.md`. `AGENTS.md` for ship/te
 - Operator language is one family per job. `.cursor/rules/operator-words.mdc`.
 - Pinned deps only. No extra HTTP framework, ORM, second WS lib, obs-websocket helper, Wails, Fyne, npm.
 - `go test`: app `Serve` on `127.0.0.1:0` with a temp DB. No `httptest`. Never exec the exe, never start tray/WebView, never `Listen` on `:18745`.
-- Live check: the tray already on `http://127.0.0.1:18745` only (health, state, popup, overlay, triggers, `/ws`). If `GET /api/health` fails, say the tray app is not up. Do not start a second one, do not copy `%APPDATA%\hesh-ups`, do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`.
+- Live check: the one tray on `http://127.0.0.1:18745` (health, state, popup, overlay, triggers, `/ws`). If `GET /api/health` fails, start it with `just run` (real `%APPDATA%\hesh-ups`, product port). Do not copy that folder. Do not set `HESH_UPS_DB` or `HESH_UPS_HTTP`. Do not bind another port. If health already succeeds, do not start another process.
 - Overlay/composer/triggers live in `cmd/hesh-ups/web/` and embed. No disk UI, no AppData skins.
 - Pages: `docs/` on `master`. No second site tree.
 - Work on `master`. Ship it = commit + push. No PRs unless asked.
