@@ -202,6 +202,61 @@ func TestR4Hide(t *testing.T) {
 	}
 }
 
+func TestHubConcurrentWrites(t *testing.T) {
+	s, ts := testSrv(t)
+	putLogo(t, s, ts)
+	c := wsDial(t, ts)
+	readType(t, c, "config", 2*time.Second)
+	readType(t, c, "snapshot", 2*time.Second)
+	done := make(chan struct{})
+	go func() {
+		post := func(path string) {
+			res, err := http.Post(ts.URL+path, "application/json", strings.NewReader("{}"))
+			if err != nil {
+				return
+			}
+			io.Copy(io.Discard, res.Body)
+			res.Body.Close()
+		}
+		for i := 0; i < 30; i++ {
+			post("/api/popup/logo")
+			post("/api/popup/logo/hide")
+		}
+		close(done)
+	}()
+	go func() {
+		for i := 0; i < 30; i++ {
+			_ = c.Write(context.Background(), websocket.MessageText, []byte(`{"type":"ping"}`))
+		}
+	}()
+	<-done
+	sawShow, sawHide, sawPong := false, false, false
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) && (!sawShow || !sawHide) {
+		ctx, cancel := context.WithDeadline(context.Background(), deadline)
+		_, data, err := c.Read(ctx)
+		cancel()
+		if err != nil {
+			break
+		}
+		var m map[string]any
+		if json.Unmarshal(data, &m) != nil {
+			continue
+		}
+		switch m["type"] {
+		case "show":
+			sawShow = true
+		case "hide":
+			sawHide = true
+		case "pong":
+			sawPong = true
+		}
+	}
+	if !sawShow || !sawHide {
+		t.Fatalf("show=%v hide=%v pong=%v", sawShow, sawHide, sawPong)
+	}
+}
+
 func TestR5HideAll(t *testing.T) {
 	s, ts := testSrv(t)
 	putLogo(t, s, ts)

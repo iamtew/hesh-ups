@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coder/websocket"
 )
 
 //go:embed all:web
@@ -531,7 +530,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleWS(w http.ResponseWriter, r *http.Request) {
-	s.hub.serve(w, r, func(c *websocket.Conn) {
+	s.hub.serve(w, r, func(c *hubClient) {
 		s.hub.send(c, s.configMsg())
 		s.hub.send(c, s.snapshot())
 	})

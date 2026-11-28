@@ -9,14 +9,25 @@ import (
 	"github.com/coder/websocket"
 )
 
+type hubClient struct {
+	c  *websocket.Conn
+	mu sync.Mutex
+}
+
+func (cl *hubClient) write(b []byte) error {
+	cl.mu.Lock()
+	defer cl.mu.Unlock()
+	return cl.c.Write(context.Background(), websocket.MessageText, b)
+}
+
 type Hub struct {
 	mu      sync.Mutex
-	clients map[*websocket.Conn]struct{}
+	clients map[*hubClient]struct{}
 	onEnded func(slot string, seq int)
 }
 
 func newHub() *Hub {
-	return &Hub{clients: map[*websocket.Conn]struct{}{}}
+	return &Hub{clients: map[*hubClient]struct{}{}}
 }
 
 func (h *Hub) broadcast(v any) {
@@ -25,31 +36,32 @@ func (h *Hub) broadcast(v any) {
 		return
 	}
 	h.mu.Lock()
-	conns := make([]*websocket.Conn, 0, len(h.clients))
+	list := make([]*hubClient, 0, len(h.clients))
 	for c := range h.clients {
-		conns = append(conns, c)
+		list = append(list, c)
 	}
 	h.mu.Unlock()
-	for _, c := range conns {
-		_ = c.Write(context.Background(), websocket.MessageText, b)
+	for _, c := range list {
+		_ = c.write(b)
 	}
 }
 
-func (h *Hub) serve(w http.ResponseWriter, r *http.Request, onConnect func(*websocket.Conn)) {
+func (h *Hub) serve(w http.ResponseWriter, r *http.Request, onConnect func(*hubClient)) {
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		return
 	}
+	cl := &hubClient{c: c}
 	h.mu.Lock()
-	h.clients[c] = struct{}{}
+	h.clients[cl] = struct{}{}
 	h.mu.Unlock()
 	if onConnect != nil {
-		onConnect(c)
+		onConnect(cl)
 	}
 	go func() {
 		defer func() {
 			h.mu.Lock()
-			delete(h.clients, c)
+			delete(h.clients, cl)
 			h.mu.Unlock()
 			c.Close(websocket.StatusNormalClosure, "")
 		}()
@@ -67,7 +79,7 @@ func (h *Hub) serve(w http.ResponseWriter, r *http.Request, onConnect func(*webs
 				continue
 			}
 			if msg.Type == "ping" {
-				_ = c.Write(context.Background(), websocket.MessageText, []byte(`{"type":"pong"}`))
+				_ = cl.write([]byte(`{"type":"pong"}`))
 				continue
 			}
 			if msg.Type == "ended" && msg.Seq != nil && h.onEnded != nil {
@@ -77,10 +89,10 @@ func (h *Hub) serve(w http.ResponseWriter, r *http.Request, onConnect func(*webs
 	}()
 }
 
-func (h *Hub) send(c *websocket.Conn, v any) {
+func (h *Hub) send(c *hubClient, v any) {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return
 	}
-	_ = c.Write(context.Background(), websocket.MessageText, b)
+	_ = c.write(b)
 }
